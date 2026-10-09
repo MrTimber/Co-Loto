@@ -174,11 +174,10 @@ button.cell:hover:not(:disabled) { --cell-line: var(--accent); }
   color: #fff;
 }
 .summary.big .ball { width: 3.2rem; height: 3.2rem; font-size: 1.3rem; }
-.ball.bonus { background: var(--bonus); color: var(--bonus-text); }
+.ball.bonus { --cell-bg: var(--bonus); --cell-line: var(--bonus); --cell-line-width: 0px; background: var(--bonus); color: var(--bonus-text); }
 
 /* Numéros complémentaires : étoiles pour l'Euromillions, gouttes pour EuroDreams (le Loto garde des ronds).
    La forme est dessinée par des pseudo-éléments placés sous le numéro, qui reprennent les couleurs de l'état de la case. */
-.ball.bonus { --cell-bg: var(--bonus); --cell-line: var(--bonus); --cell-line-width: 0px; }
 :is([data-game=euromillions], [data-game=eurodreams]) :is(.grid.bonus .cell, .ball.bonus) {
   position: relative;
   isolation: isolate;
