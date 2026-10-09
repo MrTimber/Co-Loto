@@ -1,4 +1,4 @@
-import { escapeHtml, formatDrawDate, ball } from './common.js';
+import { escapeHtml, formatDrawDate, rulesFor, applyTheme, gridBalls } from './common.js';
 
 const id = decodeURIComponent(location.pathname.split('/').pop());
 const card = document.getElementById('grid-card');
@@ -8,11 +8,14 @@ try {
   const res = await fetch(`/api/grilles/${encodeURIComponent(id)}`);
   const body = await res.json();
   if (!res.ok) throw new Error(body.error);
+  const rules = rulesFor(body.gameType);
+  applyTheme(rules.id);
   const created = new Date(body.createdAt).toLocaleDateString('fr-FR', dateFormat);
   const expires = new Date(body.expiresAt).toLocaleDateString('fr-FR', dateFormat);
   card.innerHTML = `
+    <p class="game-badge">${rules.name}</p>
     <h1>Grille co-créée</h1>
-    <div class="summary big">${body.numbers.map((n) => ball(n, 'validated')).join('')}${ball(body.chance, 'chance')}</div>
+    <div class="summary big">${gridBalls(body.numbers, body.bonus)}</div>
     <p>Choisie par ${listNames(body.players)} en ${body.rounds} tours, le ${created}.</p>
     ${body.drawDate ? `<p>Tirage prévu : ${formatDrawDate(body.drawDate)}. La vérification des résultats arrivera dans une prochaine version.</p>` : ''}
     <p class="muted small">Cette page reste consultable jusqu'au ${expires}.</p>`;
