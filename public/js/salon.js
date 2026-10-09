@@ -147,11 +147,10 @@ function renderGame() {
   $('game-players').innerHTML = playerList(state.players, { showPick: true });
 
   const last = state.lastRound;
-  $('last-round').hidden = !last;
-  if (last) {
-    $('last-round').innerHTML = last.newlyValidated.length
-      ? `Tour ${last.round} : ${last.newlyValidated.map((n) => ball(n, last.phase === 'chance' ? 'chance' : 'validated')).join(' ')} validé${last.newlyValidated.length > 1 ? 's' : ''} par tout le monde !`
-      : `Tour ${last.round} : aucun numéro commun pour l'instant.`;
+  const hasNews = Boolean(last?.newlyValidated.length);
+  $('last-round').hidden = !hasNews;
+  if (hasNews) {
+    $('last-round').innerHTML = `Tour ${last.round} : ${last.newlyValidated.map((n) => ball(n, last.phase === 'chance' ? 'chance' : 'validated')).join(' ')} validé${last.newlyValidated.length > 1 ? 's' : ''} par tout le monde !`;
   }
 
   const mine = state.me.picks[phase];
@@ -173,19 +172,20 @@ function renderGame() {
     })
     .join('');
 
-  renderCollective();
+  renderCollective(phase, max, validated);
 }
 
-function renderCollective() {
-  const { numbers, chance } = state.validated;
-  const slots = range(5).map((i) => (numbers[i] ? ball(numbers[i], 'validated') : ball('?', 'empty')));
-  slots.push(chance[0] ? ball(chance[0], 'chance') : ball('?', 'empty chance-empty'));
-  $('collective-summary').innerHTML = slots.join('');
-  $('collective-grid').innerHTML = range(49)
-    .map((n) => `<span class="cell ${numbers.includes(n) ? 'validated' : ''}">${n}</span>`)
-    .join('');
-  $('collective-chance').innerHTML = range(10)
-    .map((n) => `<span class="cell ${chance.includes(n) ? 'chance-validated' : ''}">${n}</span>`)
+// La grille collective n'affiche que la phase en cours : les 49 numéros, puis les 10 numéros chance.
+function renderCollective(phase, max, validated) {
+  $('collective-hint').textContent =
+    phase === 'numbers'
+      ? `Numéros validés par tout le monde : ${validated.length} sur 5.`
+      : 'Le numéro chance validé par tout le monde terminera la grille.';
+  const grid = $('collective-grid');
+  grid.classList.toggle('chance', phase === 'chance');
+  const validatedClass = phase === 'chance' ? 'chance-validated' : 'validated';
+  grid.innerHTML = range(max)
+    .map((n) => `<span class="cell ${validated.includes(n) ? validatedClass : ''}">${n}</span>`)
     .join('');
 }
 
