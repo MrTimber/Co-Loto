@@ -233,5 +233,6 @@ test('gridCost : grille simple, grille multiple et limites de chaque jeu (règle
   assert.equal(gridCost(euromillions, 5, 1).status, 'too_few');
   assert.deepEqual(gridCost(eurodreams, 7, 2), { status: 'multiple', combinations: 14, price: 35 });
   assert.deepEqual(gridCost(eurodreams, 9, 3), { status: 'multiple', combinations: 252, price: 630 });
-  assert.equal(gridCost(eurodreams, 10, 2).status, 'not_allowed');
+  assert.deepEqual(gridCost(eurodreams, 10, 2), { status: 'multiple', combinations: 420, price: 1050 });
+  assert.equal(gridCost(eurodreams, 10, 3).status, 'not_allowed');
 });

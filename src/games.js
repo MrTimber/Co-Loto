@@ -1,7 +1,7 @@
 // Les jeux de tirage proposés. Ce module est aussi servi tel quel au navigateur (/js/games.js).
 // Chaque jeu enchaîne deux phases : les numéros, puis les numéros complémentaires.
 // Règles vérifiées dans les règlements homologués par l'ANJ (grille simple).
-// Grilles multiples (règlements FDJ : Loto 2025-03, EuroMillions-My Million 2025-03, EuroDreams 2025-10) :
+// Grilles multiples (règlements FDJ, limites confirmées sur le site de la FDJ) :
 // `price` est la mise d'une combinaison simple, sans option (2nd tirage, Etoile+) ;
 // `multiple` donne, pour chaque nombre de numéros cochés, le nombre maximal de numéros complémentaires.
 
@@ -46,7 +46,7 @@ export const GAMES = {
       { key: 'dream', min: 1, max: 5, count: 1, columns: 5, one: 'numéro Dream', many: 'numéros Dream' },
     ],
     price: 2.5,
-    multiple: { 6: 5, 7: 5, 8: 5, 9: 3, 10: 1 },
+    multiple: { 6: 5, 7: 5, 8: 5, 9: 3, 10: 2 },
   },
 };
 
