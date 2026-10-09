@@ -29,6 +29,15 @@ function isOnline(room, playerId) {
   return false;
 }
 
+function broadcast(room) {
+  for (const socket of room.sockets) {
+    const view = viewFor(room.game, socket.data.playerId);
+    view.roomId = room.id;
+    view.players = view.players.map((p) => ({ ...p, online: isOnline(room, p.id) }));
+    socket.emit('room:state', view);
+  }
+}
+
 // Exécute une action et renvoie le résultat (ou l'erreur) via l'accusé de réception.
 function handle(ack, action) {
   const reply = typeof ack === 'function' ? ack : () => {};
@@ -165,15 +174,6 @@ export function createApp({
       socket.data = {};
     }
     rooms.delete(room.id);
-  }
-
-  function broadcast(room) {
-    for (const socket of room.sockets) {
-      const view = viewFor(room.game, socket.data.playerId);
-      view.roomId = room.id;
-      view.players = view.players.map((p) => ({ ...p, online: isOnline(room, p.id) }));
-      socket.emit('room:state', view);
-    }
   }
 
   function detach(socket) {
