@@ -215,7 +215,9 @@ function collectiveHint(phase, isBonus, validated) {
 
 function renderFinished() {
   show('finished');
-  const [numbers, bonus] = rulesFor(state.gameType).phases;
+  const rules = rulesFor(state.gameType);
+  const [numbers, bonus] = rules.phases;
+  $('finished-title').textContent = `Votre grille ${rules.name} est prête ! 🎉`;
   $('final-grid').innerHTML = gridBalls(state.validated[numbers.key], state.validated[bonus.key]);
   const url = `${location.origin}/grille/${encodeURIComponent(roomId)}`;
   $('grid-link').href = url;
