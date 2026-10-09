@@ -69,6 +69,7 @@ Le jeu est choisi à la création du salon :
 - [x] Loto, Euromillions et EuroDreams
 - [x] Page de consultation de la grille (30 jours, URL unique)
 - [x] Date de tirage optionnelle (limitée aux jours de tirage du jeu)
+- [x] Installable comme une application sur smartphone et tablette (PWA)
 - [ ] Vérification des résultats officiels à la date du tirage
 - [ ] Envoi des résultats par email (avec consentement)
 
@@ -89,7 +90,7 @@ Tout est gratuit et open source :
 | Serveur | [Node.js](https://nodejs.org/) 22.13 ou plus, [Express](https://expressjs.com/) |
 | Temps réel | [Socket.IO](https://socket.io/) (WebSocket) |
 | Base de données | SQLite, intégré à Node.js (`node:sqlite`), aucune installation |
-| Interface | HTML, CSS et JavaScript sans framework ni étape de build |
+| Interface | HTML, CSS et JavaScript sans framework ni étape de build, installable (PWA : manifeste et service worker) |
 | Tests | Lanceur de tests intégré à Node.js (`node --test`) |
 | Intégration continue | GitHub Actions |
 | Hébergement | [Render](https://render.com/), offre gratuite (fichier `render.yaml`) |
@@ -102,7 +103,8 @@ src/app.js        Serveur HTTP, API et événements temps réel
 src/store.js      Stockage des grilles terminées (SQLite, 30 jours)
 src/drawDate.js   Validation de la date de tirage
 src/index.js      Point d'entrée
-public/           Pages web (accueil, salon, grille)
+public/           Pages web (accueil, salon, grille, page hors ligne)
+public/sw.js      Service worker (installation, copie des fichiers statiques)
 test/             Tests automatisés
 ```
 
@@ -127,6 +129,16 @@ Variables d'environnement facultatives :
 | `DATABASE_FILE` | Fichier SQLite des grilles | `data/co-loto.db` |
 
 Pour tester à plusieurs sur une seule machine, ouvrez le lien du salon dans une fenêtre de navigation privée.
+
+### Installer Co-Loto sur smartphone ou tablette
+
+Co-Loto est une application web progressive (PWA) : une fois le site ouvert, on peut l'ajouter à l'écran d'accueil et il s'ouvre ensuite en plein écran, comme une application. Il faut que le site soit servi en HTTPS (c'est le cas sur Render).
+
+- **Android (Chrome, Edge, Samsung Internet)** : ouvrir le site, puis menu ⋮ > « Installer l'application » (ou « Ajouter à l'écran d'accueil »). Chrome peut aussi proposer l'installation directement.
+- **iPhone et iPad (Safari)** : ouvrir le site, toucher le bouton Partager, puis « Sur l'écran d'accueil ».
+- **Ordinateur (Chrome, Edge)** : cliquer sur l'icône d'installation dans la barre d'adresse.
+
+Le jeu se joue en temps réel, une connexion à Internet reste nécessaire ; sans réseau, l'application affiche une page « hors ligne ».
 
 ### Déploiement gratuit sur Render
 
