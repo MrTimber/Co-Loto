@@ -128,7 +128,7 @@ Pour tester à plusieurs sur une seule machine, ouvrez le lien du salon dans une
 
 Le fichier [`render.yaml`](render.yaml) du dépôt décrit déjà toute la configuration.
 
-1. Dans le tableau de bord Render, cliquez sur **New** puis **Blueprint**.
+1. Dans le tableau de bord Render, cliquez sur **New** puis **Blueprint**. Avec un compte tout neuf, Render ouvre d'abord l'assistant « Create a new Service », qui ne propose pas le Blueprint : cliquez sur **Skip** pour revenir au tableau de bord, où le bouton **New** est disponible.
 2. Choisissez le dépôt `MrTimber/Co-Loto` dans la liste (cliquez sur **Connect**).
 3. Donnez un nom au Blueprint (par exemple `co-loto`) et laissez la branche sur `main`. Render affiche le service web `co-loto` trouvé dans `render.yaml`, avec l'offre **Free**.
 4. Vérifiez la liste des ressources que Render va créer, puis cliquez sur **Deploy Blueprint**. Render installe les dépendances et démarre le site en quelques minutes.
