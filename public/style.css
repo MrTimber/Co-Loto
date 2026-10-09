@@ -87,6 +87,7 @@ h2 { font-size: 1.15rem; margin: 0 0 .75rem; }
 .center { text-align: center; }
 .muted { color: var(--muted); }
 .small { font-size: .875rem; }
+.draw-days { display: block; font-weight: 400; }
 .error { color: var(--danger); min-height: 1.5em; margin: .5rem 0; }
 
 form label, .invite label { display: block; margin-bottom: 1rem; font-weight: 600; }
