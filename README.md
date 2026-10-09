@@ -118,9 +118,52 @@ Variables d'environnement facultatives :
 
 Pour tester à plusieurs sur une seule machine, ouvrez le lien du salon dans une fenêtre de navigation privée.
 
-### Déploiement gratuit
+### Déploiement gratuit sur Render
 
-Sur [Render](https://render.com/), créez un « Blueprint » à partir de ce dépôt : le fichier `render.yaml` configure un service web gratuit. Limites à connaître de l'offre gratuite : le service s'endort après 15 minutes sans visite (le premier chargement prend alors quelques dizaines de secondes) et son disque n'est pas conservé lors d'un redéploiement ou d'un redémarrage, ce qui efface les grilles enregistrées. Pour garder les grilles 30 jours de façon fiable, une prochaine étape sera de brancher une base gratuite hébergée (par exemple [Turso](https://turso.tech/), compatible SQLite).
+[Render](https://render.com/) héberge gratuitement le site, WebSocket compris.
+
+**Préalable :** créez un compte sur [dashboard.render.com](https://dashboard.render.com/) en vous connectant avec GitHub, puis autorisez Render à accéder au dépôt `Co-Loto` (Render le propose au premier déploiement ; vous pouvez choisir « Only select repositories » et ne cocher que ce dépôt).
+
+#### Option 1 : avec le Blueprint (recommandé)
+
+Le fichier [`render.yaml`](render.yaml) du dépôt décrit déjà toute la configuration.
+
+1. Dans le tableau de bord Render, cliquez sur **New** puis **Blueprint**.
+2. Choisissez le dépôt `MrTimber/Co-Loto` dans la liste (cliquez sur **Connect**).
+3. Donnez un nom au Blueprint (par exemple `co-loto`) et laissez la branche sur `main`. Render affiche le service web `co-loto` trouvé dans `render.yaml`, avec l'offre **Free**.
+4. Vérifiez la liste des ressources que Render va créer, puis cliquez sur **Deploy Blueprint**. Render installe les dépendances et démarre le site en quelques minutes.
+5. Ouvrez le service `co-loto` : son adresse publique s'affiche en haut de la page, sous la forme `https://co-loto-xxxx.onrender.com`. C'est l'adresse à partager.
+
+#### Option 2 : créer le service web à la main
+
+1. Dans le tableau de bord Render, cliquez sur **New** puis **Web Service**.
+2. Choisissez **Git Provider**, puis le dépôt `MrTimber/Co-Loto` (cliquez sur **Connect**).
+3. Remplissez le formulaire :
+
+   | Champ | Valeur |
+   |---|---|
+   | Name | `co-loto` |
+   | Language | `Node` |
+   | Branch | `main` |
+   | Root Directory | _(laisser vide)_ |
+   | Build Command | `npm ci --omit=dev` |
+   | Start Command | `npm start` |
+   | Instance Type | **Free** |
+
+4. Dans **Environment Variables**, ajoutez `NODE_VERSION` avec la valeur `22` (Co-Loto a besoin de Node.js 22.13 ou plus).
+5. Cliquez sur **Deploy Web Service**, puis attendez que le journal affiche `Co-Loto est lancé`. L'adresse publique est en haut de la page du service.
+
+#### Mises à jour
+
+Chaque fusion dans `main` redéploie automatiquement le site (« Auto-Deploy », activé par défaut). Pour redéployer à la main : **Manual Deploy** puis **Deploy latest commit** sur la page du service.
+
+#### Limites de l'offre gratuite
+
+- **Mise en veille :** le service s'endort après 15 minutes sans visite. La visite suivante le réveille, mais le premier chargement prend alors environ une minute. Une partie en cours n'est pas concernée, puisque les joueurs restent connectés.
+- **Disque éphémère :** les fichiers ne sont pas conservés lors d'un redéploiement, d'un redémarrage ou d'une mise en veille. La base SQLite des grilles terminées est donc effacée à ces moments-là, et les liens `/grille/...` ne fonctionnent plus. Les salons en cours sont aussi perdus lors d'un redéploiement.
+- **Quota mensuel :** l'offre gratuite donne 750 heures d'exécution par mois et par espace de travail, de quoi faire tourner un service en continu.
+
+Pour garder les grilles 30 jours de façon fiable, une prochaine étape sera de brancher une base gratuite hébergée (par exemple [Turso](https://turso.tech/), compatible SQLite).
 
 ## Prochaines étapes
 
