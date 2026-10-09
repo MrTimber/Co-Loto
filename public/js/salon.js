@@ -291,7 +291,7 @@ function renderFinished() {
   $('grid-link').textContent = url;
   if (!offerShown) {
     offerShown = true;
-    renderGridAccountOffer($('account-offer'), roomId);
+    void renderGridAccountOffer($('account-offer'), roomId);
   }
 }
 

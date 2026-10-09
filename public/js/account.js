@@ -1,4 +1,4 @@
-// Compte facultatif : lien « Se connecter » / « Mes grilles » dans l'en-tête,
+// Compte facultatif : boutons de connexion, encart de fin de partie,
 // et rattachement des grilles jouées sur cet appareil au compte connecté.
 import { loadToken } from './common.js';
 
@@ -73,25 +73,3 @@ export async function renderGridAccountOffer(container, gridId) {
   }
   container.hidden = false;
 }
-
-async function renderHeader() {
-  const header = document.querySelector('.site-header');
-  if (!header) return;
-  const { user, providers } = await getAccount();
-  if (!user && !providers.length) return;
-  const nav = el('nav', 'account');
-  nav.setAttribute('aria-label', 'Compte');
-  if (user) {
-    const link = el('a', '', 'Mes grilles');
-    link.href = '/mes-grilles';
-    nav.append(link);
-    claimStoredGrids();
-  } else if (location.pathname !== '/connexion') {
-    const link = el('a', '', 'Se connecter');
-    link.href = `/connexion?retour=${encodeURIComponent(currentPath())}`;
-    nav.append(link);
-  }
-  header.append(nav);
-}
-
-renderHeader();

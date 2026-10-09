@@ -21,7 +21,7 @@ function gridItem(grid) {
     'my-grid',
     el('p', 'my-grid-title', link),
     el('div', 'summary', ...balls(grid.numbers, 'validated'), ...balls(grid.bonus, 'bonus')),
-    el('p', 'small muted', `Avec ${grid.players.join(', ')}${grid.drawDate ? ` · tirage du ${formatDrawDate(grid.drawDate)}` : ''}`),
+    el('p', 'small muted', `Avec ${grid.players.join(', ')}`, grid.drawDate ? ` · tirage du ${formatDrawDate(grid.drawDate)}` : ''),
     remove,
   );
   item.dataset.game = rules.id;

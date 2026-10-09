@@ -10,7 +10,9 @@ if (params.has('erreur')) {
 
 const { user, providers } = await getAccount();
 if (user) {
-  location.replace(retour.startsWith('/') && !retour.startsWith('//') ? retour : '/mes-grilles');
+  const link = el('a', '', 'Mes grilles');
+  link.href = '/mes-grilles';
+  box.replaceChildren(el('p', '', `Vous êtes déjà connecté en tant que ${user.name}. Retrouvez vos grilles dans `, link, '.'));
 } else if (providers.length) {
   box.replaceChildren(providerButtons(providers, retour));
 } else {

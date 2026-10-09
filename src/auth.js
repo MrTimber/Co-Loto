@@ -91,8 +91,10 @@ export function parseCookies(header = '') {
 
 // Adresse de retour après connexion : uniquement un chemin de ce site.
 export function safeReturnPath(value) {
-  if (typeof value !== 'string' || value.length > 200) return '/mes-grilles';
-  return /^\/(?![/\\])[^\\\s]*$/.test(value) ? value : '/mes-grilles';
+  const fallback = '/mes-grilles';
+  if (typeof value !== 'string' || value.length > 200 || !value.startsWith('/')) return fallback;
+  if (value.startsWith('//') || value.includes('\\') || /\s/.test(value)) return fallback;
+  return value;
 }
 
 function cleanName(name) {
@@ -179,7 +181,8 @@ export function createAuth({ store, env = process.env, fetchImpl = (...args) => 
       logIn(req, res, { provider: providerId, providerId: profile.id, name: profile.name });
       res.redirect(retour);
     } catch (err) {
-      console.error(`Connexion ${providerId} impossible :`, err.message);
+      // Message nettoyé : il peut contenir une réponse du fournisseur.
+      console.error(`Connexion ${PROVIDERS[providerId].label} impossible :`, String(err.message).replaceAll(/[\r\n]/g, ' '));
       failed();
     }
   });

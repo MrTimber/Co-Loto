@@ -44,7 +44,7 @@ try {
     card.append(el('p', '', `Tirage prévu : ${formatDrawDate(body.drawDate)}. La vérification des résultats arrivera dans une prochaine version.`));
   }
   card.append(el('p', 'muted small', `Cette page reste consultable jusqu'au ${expires}.`));
-  renderGridAccountOffer(document.getElementById('account-offer'), id);
+  await renderGridAccountOffer(document.getElementById('account-offer'), id);
 } catch (err) {
   card.replaceChildren(el('h1', '', 'Grille introuvable'), el('p', 'muted', err.message || 'Impossible de charger la grille.'));
 }
