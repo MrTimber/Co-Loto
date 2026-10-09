@@ -142,6 +142,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   --cell-line: var(--border);
   --cell-line-width: 1px;
   --cell-text: var(--text);
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -157,7 +158,6 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 @media (hover: hover) {
   button.cell:hover:not(:disabled, .pending) { --cell-line: var(--accent); }
 }
-.cell { position: relative; }
 .cell.picked { --cell-bg: var(--picked); --cell-text: var(--muted); opacity: 1; cursor: default; }
 .cell.pending { --cell-bg: var(--pending-soft); --cell-line: var(--pending); --cell-line-width: 2px; }
 .cell.validated { --cell-bg: var(--accent); --cell-line: var(--accent); --cell-text: var(--accent-text); text-decoration: none; }
