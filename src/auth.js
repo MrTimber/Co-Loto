@@ -7,7 +7,8 @@ import { Google, MicrosoftEntraId, GitHub, Discord, generateState, generateCodeV
 const SESSION_COOKIE = 'coloto_session';
 const OAUTH_COOKIE = 'coloto_oauth';
 const OAUTH_MAX_AGE_MS = 10 * 60_000;
-const NAME_MAX_LENGTH = 40;
+const NAME_MAX_LENGTH = 24; // comme le pseudo des parties
+const EMAIL_MAX_LENGTH = 254;
 
 async function getJson(fetchImpl, url, accessToken) {
   const res = await fetchImpl(url, { headers: { authorization: `Bearer ${accessToken}`, 'user-agent': 'Co-Loto', accept: 'application/json' } });
@@ -15,50 +16,57 @@ async function getJson(fetchImpl, url, accessToken) {
   return res.json();
 }
 
-// `pkce` : le fournisseur attend un code_verifier. `profile` ne garde que l'identifiant et le nom affiché.
+// Adresse email vérifiée renvoyée par le fournisseur, sinon null.
+const verifiedEmail = (email, verified) => (verified && typeof email === 'string' ? email : null);
+
+// `pkce` : le fournisseur attend un code_verifier. `profile` renvoie l'identifiant, l'email
+// et, quand le fournisseur en a un, un pseudo (jamais le vrai nom ni le prénom).
 export const PROVIDERS = {
   google: {
     label: 'Google',
     envPrefix: 'GOOGLE',
     pkce: true,
-    scopes: ['openid', 'profile'],
+    scopes: ['openid', 'email'],
     client: (id, secret, callback) => new Google(id, secret, callback),
     profile: async (tokens) => {
       const claims = decodeIdToken(tokens.idToken());
-      return { id: claims.sub, name: claims.given_name ?? claims.name };
+      return { id: claims.sub, email: verifiedEmail(claims.email, claims.email_verified) };
     },
   },
   microsoft: {
     label: 'Microsoft',
     envPrefix: 'MICROSOFT',
     pkce: true,
-    scopes: ['openid', 'profile'],
+    scopes: ['openid', 'email'],
     client: (id, secret, callback, env) => new MicrosoftEntraId(env.MICROSOFT_TENANT || 'common', id, secret, callback),
     profile: async (tokens) => {
+      // Microsoft ne garantit pas que l'adresse a été vérifiée : elle est gardée comme non vérifiée.
       const claims = decodeIdToken(tokens.idToken());
-      return { id: claims.sub, name: claims.name };
+      return { id: claims.sub, email: typeof claims.email === 'string' ? claims.email : null, emailVerified: false };
     },
   },
   github: {
     label: 'GitHub',
     envPrefix: 'GITHUB',
     pkce: false,
-    scopes: [],
+    scopes: ['user:email'],
     client: (id, secret, callback) => new GitHub(id, secret, callback),
     profile: async (tokens, fetchImpl) => {
       const user = await getJson(fetchImpl, 'https://api.github.com/user', tokens.accessToken());
-      return { id: String(user.id), name: user.name || user.login };
+      const emails = await getJson(fetchImpl, 'https://api.github.com/user/emails', tokens.accessToken());
+      const primary = Array.isArray(emails) ? emails.find((e) => e.primary) : null;
+      return { id: String(user.id), pseudo: user.login, email: verifiedEmail(primary?.email, primary?.verified) };
     },
   },
   discord: {
     label: 'Discord',
     envPrefix: 'DISCORD',
     pkce: true,
-    scopes: ['identify'],
+    scopes: ['identify', 'email'],
     client: (id, secret, callback) => new Discord(id, secret, callback),
     profile: async (tokens, fetchImpl) => {
       const user = await getJson(fetchImpl, 'https://discord.com/api/users/@me', tokens.accessToken());
-      return { id: String(user.id), name: user.global_name || user.username };
+      return { id: String(user.id), pseudo: user.username, email: verifiedEmail(user.email, user.verified) };
     },
   },
 };
@@ -89,9 +97,17 @@ export function parseCookies(header = '') {
   return cookies;
 }
 
-function cleanName(name) {
-  const text = String(name ?? '').replaceAll(/\s+/g, ' ').trim().slice(0, NAME_MAX_LENGTH);
-  return text || 'Joueur';
+export function cleanName(name) {
+  return String(name ?? '').split(/\s/).filter(Boolean).join(' ').slice(0, NAME_MAX_LENGTH);
+}
+
+// Vérification simple de la forme d'une adresse email (sans expression régulière coûteuse).
+export function isEmail(value) {
+  if (typeof value !== 'string' || value.length > EMAIL_MAX_LENGTH || /\s/.test(value)) return false;
+  const parts = value.split('@');
+  if (parts.length !== 2 || !parts[0]) return false;
+  const domain = parts[1];
+  return domain.includes('.') && !domain.startsWith('.') && !domain.endsWith('.');
 }
 
 const DEFAULT_RETURN = '/mes-grilles';
@@ -137,8 +153,10 @@ export function createAuth({ store, env = process.env, findRoomId = () => undefi
     return store.getSessionUser(parseCookies(req.headers.cookie)[SESSION_COOKIE]);
   }
 
-  function logIn(req, res, { provider, providerId, name }) {
-    const user = store.upsertUser({ provider, providerId, name: cleanName(name) });
+  // Pseudo d'un nouveau compte : celui du fournisseur s'il en a un (GitHub, Discord),
+  // sinon celui que le joueur utilise déjà dans ses parties.
+  function logIn(req, res, { provider, providerId, pseudo, email = null, emailVerified = Boolean(email) }) {
+    const user = store.upsertUser({ provider, providerId, name: cleanName(pseudo) || 'Joueur', email, emailVerified });
     res.cookie(SESSION_COOKIE, store.createSession(user.id), cookieOptions(req, 30 * 24 * 60 * 60_000));
   }
 
@@ -151,7 +169,8 @@ export function createAuth({ store, env = process.env, findRoomId = () => undefi
 
   router.get('/auth/dev', (req, res, next) => {
     if (!providers.includes('dev')) return next();
-    logIn(req, res, { provider: 'dev', providerId: cleanName(req.query.nom ?? 'Testeur'), name: req.query.nom ?? 'Testeur' });
+    const pseudo = cleanName(req.query.nom) || 'Testeur';
+    logIn(req, res, { provider: 'dev', providerId: pseudo, pseudo, email: isEmail(req.query.email) ? req.query.email : null });
     res.redirect(returnPath(req.query.retour));
   });
 
@@ -163,7 +182,7 @@ export function createAuth({ store, env = process.env, findRoomId = () => undefi
     const verifier = pkce ? generateCodeVerifier() : null;
     const client = oauthClient(req, providerId);
     const url = pkce ? client.createAuthorizationURL(state, verifier, scopes) : client.createAuthorizationURL(state, scopes);
-    const pending = { provider: providerId, state, verifier, retour: returnPath(req.query.retour) };
+    const pending = { provider: providerId, state, verifier, retour: returnPath(req.query.retour), pseudo: cleanName(req.query.pseudo) };
     res.cookie(OAUTH_COOKIE, Buffer.from(JSON.stringify(pending)).toString('base64url'), cookieOptions(req, OAUTH_MAX_AGE_MS, '/auth'));
     res.redirect(url.toString());
   });
@@ -191,7 +210,13 @@ export function createAuth({ store, env = process.env, findRoomId = () => undefi
         : await client.validateAuthorizationCode(req.query.code);
       const profile = await provider.profile(tokens, fetchImpl);
       if (!profile.id) throw new Error('Identifiant manquant');
-      logIn(req, res, { provider: providerId, providerId: profile.id, name: profile.name });
+      logIn(req, res, {
+        provider: providerId,
+        providerId: profile.id,
+        pseudo: cleanName(profile.pseudo) || cleanName(pending.pseudo),
+        email: isEmail(profile.email) ? profile.email : null,
+        emailVerified: profile.emailVerified,
+      });
       res.redirect(retour);
     } catch (err) {
       // Message nettoyé : il peut contenir une réponse du fournisseur.
@@ -210,9 +235,27 @@ export function createAuth({ store, env = process.env, findRoomId = () => undefi
     const user = currentUser(req);
     res.set('cache-control', 'no-store');
     res.json({
-      user: user && { name: user.name, provider: user.provider },
+      user: user && {
+        name: user.name,
+        provider: user.provider,
+        email: user.email,
+        emailVerified: user.emailVerified,
+        emailConsent: user.emailConsent,
+      },
       providers: providers.map((id) => ({ id, label: PROVIDERS[id]?.label ?? 'Compte de test' })),
     });
+  });
+
+  // Modification du pseudo, de l'email et de l'accord pour recevoir les résultats.
+  router.patch('/api/compte', requireUser, (req, res) => {
+    const { name, email = '', emailConsent = false } = req.body ?? {};
+    const pseudo = cleanName(name);
+    if (!pseudo) return res.status(400).json({ error: 'Choisissez un pseudo.' });
+    const address = typeof email === 'string' ? email.trim() : '';
+    if (address && !isEmail(address)) return res.status(400).json({ error: 'Cette adresse email ne semble pas valide.' });
+    if (emailConsent === true && !address) return res.status(400).json({ error: 'Indiquez une adresse email pour recevoir les résultats.' });
+    store.updateUser(req.user.id, { name: pseudo, email: address || null, emailConsent: emailConsent === true });
+    res.json({ ok: true });
   });
 
   router.delete('/api/compte', requireUser, (req, res) => {

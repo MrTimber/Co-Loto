@@ -24,7 +24,9 @@ export const currentPath = () => location.pathname + location.search;
 export function providerButtons(providers, retour = currentPath()) {
   return el('div', 'providers', ...providers.map((p) => {
     const link = el('a', `button provider provider-${p.id}`, `Continuer avec ${p.label}`);
-    link.href = `/auth/${p.id}?retour=${encodeURIComponent(retour)}`;
+    // Le pseudo déjà utilisé dans les parties sert de pseudo au nouveau compte.
+    const pseudo = localStorage.getItem('coloto:name');
+    link.href = `/auth/${p.id}?retour=${encodeURIComponent(retour)}${pseudo ? `&pseudo=${encodeURIComponent(pseudo)}` : ''}`;
     return link;
   }));
 }
@@ -68,7 +70,7 @@ export async function renderGridAccountOffer(container, gridId) {
       el('h2', '', 'Retrouvez cette grille dans votre espace'),
       el('p', 'small muted', 'Connectez-vous pour la garder dans « Mes grilles » et la retrouver depuis n’importe quel appareil.'),
       providerButtons(providers, `/grille/${encodeURIComponent(gridId)}`),
-      el('p', 'small muted', privacy, ' : seulement votre nom affiché et un identifiant technique.'),
+      el('p', 'small muted', privacy, ' : un pseudo et votre adresse email, jamais vos nom et prénom.'),
     );
   }
   container.hidden = false;

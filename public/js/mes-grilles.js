@@ -2,6 +2,7 @@ import { getAccount, claimStoredGrids, providerButtons, el } from './account.js'
 import { rulesFor, formatDrawDate } from './common.js';
 
 const card = document.getElementById('my-grids');
+const PROVIDER_NAMES = { google: 'Google', microsoft: 'Microsoft', github: 'GitHub', discord: 'Discord', dev: 'le compte de test' };
 const dateFormat = { day: 'numeric', month: 'long', year: 'numeric' };
 
 function balls(numbers, extra) {
@@ -32,6 +33,46 @@ function gridItem(grid) {
   return item;
 }
 
+function profileForm(user) {
+  const form = el('form', 'profile');
+  const field = (label, input) => el('label', '', label, input);
+  const name = el('input');
+  Object.assign(name, { name: 'name', required: true, maxLength: 24, autocomplete: 'nickname', value: user.name });
+  const email = el('input');
+  Object.assign(email, { name: 'email', type: 'email', maxLength: 254, autocomplete: 'email', value: user.email ?? '' });
+  const consent = el('input');
+  Object.assign(consent, { name: 'emailConsent', type: 'checkbox', checked: user.emailConsent });
+  const status = el('output', 'small');
+  const save = el('button', 'primary', 'Enregistrer');
+  save.type = 'submit';
+  form.append(
+    el('h2', '', 'Mon compte'),
+    field('Pseudo', name),
+    field('Adresse email', email),
+    el('label', 'inline', consent, ' M\u2019envoyer par email le résultat de mes grilles qui ont une date de tirage'),
+    el('p', 'small muted', 'L\u2019envoi des résultats arrivera dans une prochaine version. Vous pouvez retirer cet accord à tout moment.'),
+    el('div', 'actions', save, status),
+  );
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    status.className = 'small';
+    const res = await fetch('/api/compte', {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: name.value, email: email.value, emailConsent: consent.checked }),
+    }).catch(() => null);
+    const body = await res?.json().catch(() => ({}));
+    if (res?.ok) {
+      status.textContent = 'Enregistré.';
+      localStorage.setItem('coloto:name', name.value.trim());
+    } else {
+      status.className = 'small error';
+      status.textContent = body?.error ?? 'Enregistrement impossible, réessayez.';
+    }
+  });
+  return form;
+}
+
 function accountActions(user) {
   const logout = el('button', '', 'Se déconnecter');
   logout.type = 'button';
@@ -49,7 +90,7 @@ function accountActions(user) {
   const privacy = el('a', '', 'Confidentialité');
   privacy.href = '/confidentialite';
   return [
-    el('p', 'small muted', `Connecté en tant que ${user.name}. `, privacy),
+    el('p', 'small muted', `Connecté avec ${PROVIDER_NAMES[user.provider] ?? user.provider}. `, privacy),
     el('div', 'actions', logout, remove),
   ];
 }
@@ -65,7 +106,7 @@ if (user) {
   } else {
     card.append(el('p', 'muted', 'Aucune grille pour l’instant. Les grilles que vous co-créez en étant connecté apparaissent ici pendant 30 jours.'));
   }
-  card.append(...accountActions(user));
+  card.append(profileForm(user), ...accountActions(user));
 } else {
   card.replaceChildren(
     el('h1', '', 'Mes grilles'),

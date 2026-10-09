@@ -287,3 +287,6 @@ form label.game-option {
 .my-grid button.link { padding-left: 0; }
 .account-offer > :first-child { margin-top: 0; }
 .account-offer > :last-child { margin-bottom: 0; }
+.profile { border-top: 1px solid var(--border); padding-top: 1rem; margin-bottom: 1rem; }
+.profile label.inline { display: flex; gap: .5rem; align-items: flex-start; }
+.profile input[type=checkbox] { width: auto; margin-top: .3rem; flex: none; }

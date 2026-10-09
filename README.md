@@ -55,7 +55,7 @@ Le jeu est choisi à la création du salon :
 
 - Les joueurs jouent la grille co-créée comme ils le souhaitent : en point de vente, sur le site de la FDJ, chacun de leur côté, ou ensemble en partageant les gains.
 - La grille reste consultable **30 jours** après sa création grâce à l'**URL unique** de la partie.
-- Un joueur connecté retrouve toutes ses grilles dans **« Mes grilles »**. Un joueur qui a joué sans compte se voit proposer, à la fin de la partie, de se connecter : la grille qu'il vient de co-créer est alors ajoutée à son espace.
+- Un joueur connecté retrouve toutes ses grilles dans **« Mes grilles »**, où il peut aussi modifier son pseudo et son adresse email, accepter de recevoir les résultats par email, et supprimer son compte. Un joueur qui a joué sans compte se voit proposer, à la fin de la partie, de se connecter : la grille qu'il vient de co-créer est alors ajoutée à son espace.
 - Si une date de tirage a été indiquée, le résultat de la grille est évalué à la publication des résultats officiels et affiché sur la page de la grille.
 - Les joueurs qui ont renseigné leur adresse email et donné leur accord peuvent **recevoir le résultat par email**.
 
@@ -207,7 +207,7 @@ Les aperçus de pull request ont une autre adresse : la connexion n'y fonctionne
 
 **Google** ([console.cloud.google.com](https://console.cloud.google.com/))
 1. Créez un projet (sélecteur de projet en haut, puis **Nouveau projet**).
-2. Menu **API et services** > **Écran de consentement OAuth** (« Google Auth Platform ») : nom de l'application `Co-Loto`, email d'assistance, audience **Externe**, puis publiez l'application (**Audience** > **Publier l'application**) pour qu'elle soit ouverte à tous. Seules les informations de base du profil sont demandées, aucune validation par Google n'est nécessaire.
+2. Menu **API et services** > **Écran de consentement OAuth** (« Google Auth Platform ») : nom de l'application `Co-Loto`, email d'assistance, audience **Externe**, puis publiez l'application (**Audience** > **Publier l'application**) pour qu'elle soit ouverte à tous. Co-Loto ne demande que l'adresse email (`openid`, `email`) : aucune validation par Google n'est nécessaire.
 3. **Clients** > **Créer un client** : type **Application Web**, ajoutez l'URL de rappel dans **URI de redirection autorisés**, puis **Créer**.
 4. Copiez l'**ID client** dans `GOOGLE_CLIENT_ID` et le **code secret** dans `GOOGLE_CLIENT_SECRET`.
 
@@ -227,7 +227,7 @@ Les aperçus de pull request ont une autre adresse : la connexion n'y fonctionne
 2. Onglet **OAuth2** : copiez le **Client ID** dans `DISCORD_CLIENT_ID`, puis **Reset Secret** et copiez le secret dans `DISCORD_CLIENT_SECRET`.
 3. Dans **Redirects**, ajoutez l'URL de rappel et enregistrez.
 
-Données conservées : uniquement le fournisseur, l'identifiant technique qu'il donne et le nom affiché (pas d'adresse email). Le détail est sur la page `/confidentialite` du site.
+Co-Loto demande à chaque service l'accès à l'adresse email, pour pouvoir envoyer plus tard les résultats des grilles (uniquement avec l'accord du joueur, donné dans « Mes grilles »). Données conservées : le fournisseur, l'identifiant technique qu'il donne, l'adresse email et un pseudo (celui des parties, ou le pseudo GitHub ou Discord ; jamais les vrais nom et prénom). Le joueur modifie son pseudo et son email dans « Mes grilles », et peut y supprimer son compte. Le détail est sur la page `/confidentialite` du site.
 
 #### Mises à jour
 

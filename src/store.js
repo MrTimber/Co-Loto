@@ -10,6 +10,17 @@ export const SESSION_LIFETIME_MS = 30 * 24 * 60 * 60 * 1000;
 // Les jetons (session, participation) ne sont jamais stockés en clair.
 const hash = (token) => createHash('sha256').update(String(token)).digest('base64url');
 
+function toUser(row) {
+  return {
+    id: row.id,
+    provider: row.provider,
+    name: row.name,
+    email: row.email,
+    emailVerified: Boolean(row.email_verified),
+    emailConsent: Boolean(row.email_consent),
+  };
+}
+
 function toGrid(row) {
   return {
     id: row.id,
@@ -43,13 +54,17 @@ export function openStore(file = ':memory:') {
   const columns = new Set(db.prepare('PRAGMA table_info(grids)').all().map((c) => c.name));
   if (!columns.has('game_type')) db.exec("ALTER TABLE grids ADD COLUMN game_type TEXT NOT NULL DEFAULT 'loto'");
   if (!columns.has('bonus')) db.exec('ALTER TABLE grids ADD COLUMN bonus TEXT');
-  // Comptes : uniquement l'identifiant chez le fournisseur et le nom affiché.
+  // Comptes : identifiant chez le fournisseur, pseudo et email (jamais le vrai nom).
+  // `email_consent` : accord explicite pour recevoir les résultats par email.
   db.exec(`
     CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY,
       provider TEXT NOT NULL,
       provider_id TEXT NOT NULL,
       name TEXT NOT NULL,
+      email TEXT,
+      email_verified INTEGER NOT NULL DEFAULT 0,
+      email_consent INTEGER NOT NULL DEFAULT 0,
       created_at INTEGER NOT NULL,
       UNIQUE (provider, provider_id)
     );
@@ -73,12 +88,20 @@ export function openStore(file = ':memory:') {
   const select = db.prepare('SELECT * FROM grids WHERE id = ? AND expires_at > ?');
   const purge = db.prepare('DELETE FROM grids WHERE expires_at <= ?');
   const insertPlayer = db.prepare('INSERT OR IGNORE INTO grid_players (token_hash, grid_id, name) VALUES (?, ?, ?)');
-  const selectUser = db.prepare('SELECT id, provider, name FROM users WHERE provider = ? AND provider_id = ?');
-  const insertUser = db.prepare('INSERT INTO users (id, provider, provider_id, name, created_at) VALUES (?, ?, ?, ?, ?)');
-  const renameUser = db.prepare('UPDATE users SET name = ? WHERE id = ?');
+  const USER_COLUMNS = 'users.id, users.provider, users.name, users.email, users.email_verified, users.email_consent';
+  const selectUser = db.prepare(`SELECT ${USER_COLUMNS} FROM users WHERE provider = ? AND provider_id = ?`);
+  const insertUser = db.prepare(`
+    INSERT INTO users (id, provider, provider_id, name, email, email_verified, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)
+  `);
+  const setProviderEmail = db.prepare('UPDATE users SET email = ?, email_verified = ? WHERE id = ? AND email IS NULL');
+  const updateUserStmt = db.prepare(`
+    UPDATE users SET name = ?, email = ?, email_consent = ?,
+      email_verified = CASE WHEN email IS ? THEN email_verified ELSE 0 END
+    WHERE id = ?
+  `);
   const insertSession = db.prepare('INSERT INTO sessions (token_hash, user_id, expires_at) VALUES (?, ?, ?)');
   const selectSession = db.prepare(`
-    SELECT users.id, users.provider, users.name FROM sessions JOIN users ON users.id = sessions.user_id
+    SELECT ${USER_COLUMNS} FROM sessions JOIN users ON users.id = sessions.user_id
     WHERE sessions.token_hash = ? AND sessions.expires_at > ?
   `);
   const deleteSessionStmt = db.prepare('DELETE FROM sessions WHERE token_hash = ?');
@@ -120,16 +143,22 @@ export function openStore(file = ':memory:') {
       const row = select.get(id, now);
       return row ? toGrid(row) : null;
     },
-    // Retrouve le compte lié à un fournisseur, ou le crée. Le nom suit celui du fournisseur.
-    upsertUser({ provider, providerId, name }, now = Date.now()) {
+    // Retrouve le compte lié à un fournisseur, ou le crée avec ce pseudo et cet email.
+    // Ensuite, pseudo et email ne changent que depuis l'espace du joueur (l'email du
+    // fournisseur ne sert qu'à compléter un compte qui n'en a pas).
+    upsertUser({ provider, providerId, name, email = null, emailVerified = false }, now = Date.now()) {
       const existing = selectUser.get(provider, providerId);
       if (existing) {
-        if (existing.name !== name) renameUser.run(name, existing.id);
-        return { ...existing, name };
+        if (email) setProviderEmail.run(email, emailVerified ? 1 : 0, existing.id);
+        return toUser(selectUser.get(provider, providerId));
       }
       const id = randomUUID();
-      insertUser.run(id, provider, providerId, name, now);
-      return { id, provider, name };
+      insertUser.run(id, provider, providerId, name, email, email && emailVerified ? 1 : 0, now);
+      return toUser(selectUser.get(provider, providerId));
+    },
+    // Une adresse modifiée à la main n'est plus considérée comme vérifiée.
+    updateUser(id, { name, email, emailConsent }) {
+      updateUserStmt.run(name, email, email && emailConsent ? 1 : 0, email, id);
     },
     createSession(userId, now = Date.now()) {
       const token = randomBytes(32).toString('base64url');
@@ -139,7 +168,7 @@ export function openStore(file = ':memory:') {
     getSessionUser(token, now = Date.now()) {
       if (!token) return null;
       const row = selectSession.get(hash(token), now);
-      return row ? { id: row.id, provider: row.provider, name: row.name } : null;
+      return row ? toUser(row) : null;
     },
     deleteSession(token) {
       if (token) deleteSessionStmt.run(hash(token));
