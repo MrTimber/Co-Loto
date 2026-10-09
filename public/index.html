@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Co-Loto · Créer une grille à plusieurs</title>
+  <meta name="description" content="Co-créez une grille de Loto avec vos amis, en temps réel. Gratuit, sans affiliation avec la FDJ.">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="site-header">
+    <a class="logo" href="/">Co-Loto</a>
+  </header>
+
+  <main class="container">
+    <section class="intro">
+      <h1>Choisissez vos numéros ensemble</h1>
+      <p>Chacun coche des numéros dans sa grille. Un numéro rejoint la grille commune quand <strong>tout le monde</strong> l'a choisi.
+        Cinq numéros, puis le numéro chance, et votre grille co-créée est prête.</p>
+    </section>
+
+    <div class="columns">
+      <section class="card">
+        <h2>Créer un salon</h2>
+        <form id="create-form">
+          <label>Votre pseudo
+            <input name="name" required maxlength="24" autocomplete="nickname">
+          </label>
+          <label>Nombre maximum de joueurs
+            <select name="maxPlayers"></select>
+          </label>
+          <fieldset>
+            <legend>Accès</legend>
+            <label class="inline"><input type="radio" name="visibility" value="private" checked> Privé, sur invitation par lien</label>
+            <label class="inline"><input type="radio" name="visibility" value="public"> Public, visible dans la liste des salons</label>
+          </fieldset>
+          <label>Date du tirage prévu <span class="muted">(optionnel : lundi, mercredi ou samedi)</span>
+            <input type="date" name="drawDate">
+          </label>
+          <p class="error" id="create-error" role="alert"></p>
+          <button type="submit" class="primary">Ouvrir le salon</button>
+        </form>
+      </section>
+
+      <section class="card">
+        <h2>Salons publics</h2>
+        <ul id="lobbies" class="lobbies"><li class="muted">Chargement…</li></ul>
+        <p class="muted small">Pour rejoindre un salon privé, ouvrez simplement le lien d'invitation reçu.</p>
+      </section>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    Co-Loto est un site gratuit, sans aucune affiliation avec la Française des Jeux (<a href="https://www.fdj.fr/" rel="noopener">fdj.fr</a>). Il ne vend aucun ticket et ne prend aucun pari.
+  </footer>
+  <script type="module" src="/js/home.js"></script>
+</body>
+</html>
