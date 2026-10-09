@@ -46,7 +46,7 @@ export const GAMES = {
       { key: 'dream', min: 1, max: 5, count: 1, columns: 5, one: 'numéro Dream', many: 'numéros Dream' },
     ],
     price: 2.5,
-    multiple: { 6: 5, 7: 5, 8: 5, 9: 3, 10: 2 },
+    multiple: { 6: 5, 7: 5, 8: 5, 9: 3, 10: 1 },
   },
 };
 
