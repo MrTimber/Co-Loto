@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createGame, addPlayer, startGame, pick, removePlayer, viewFor, commonPicks, GameError } from '../src/game.js';
+import { GAMES, gridCost } from '../src/games.js';
 
 function setup(names = ['Alice', 'Bob'], options = {}) {
   const game = createGame({ maxPlayers: Math.max(3, names.length), ...options });
@@ -9,9 +10,9 @@ function setup(names = ['Alice', 'Bob'], options = {}) {
 }
 
 // Joue un tour : chaque joueur choisit le numéro indiqué.
-function playRound(game, picks, rng) {
+function playRound(game, picks) {
   let result = null;
-  for (const [id, n] of Object.entries(picks)) result = pick(game, id, n, rng) ?? result;
+  for (const [id, n] of Object.entries(picks)) result = pick(game, id, n) ?? result;
   return result;
 }
 
@@ -116,17 +117,21 @@ test('après 5 numéros, la partie passe au numéro chance puis se termine', () 
   throwsCode(() => pick(game, 'alice', 4), 'not_playing');
 });
 
-test("s'il y a plus de numéros unanimes que de places, un tirage au sort départage", () => {
+test('les numéros unanimes au même tour sont tous gardés, même au-delà du nombre prévu', () => {
   const game = setup();
   startGame(game, 'alice');
   for (const n of [1, 2, 3, 4]) playRound(game, { alice: n, bob: n });
   playRound(game, { alice: 10, bob: 20 });
-  // Au tour suivant, 10 et 20 deviennent unanimes en même temps, mais il ne reste qu'une place.
-  const result = playRound(game, { alice: 20, bob: 10 }, () => 0);
-  assert.equal(result.newlyValidated.length, 1);
-  assert.equal(game.validated.numbers.length, 5);
-  assert.ok([10, 20].includes(result.newlyValidated[0]));
+  // Au tour suivant, 10 et 20 deviennent unanimes en même temps alors qu'il ne reste qu'une place.
+  const result = playRound(game, { alice: 20, bob: 10 });
+  assert.deepEqual(result.newlyValidated, [10, 20]);
+  assert.deepEqual(game.validated.numbers, [1, 2, 3, 4, 10, 20]);
   assert.equal(game.phase, 'chance');
+  // De même pour les numéros chance : la partie se termine avec les deux.
+  playRound(game, { alice: 3, bob: 7 });
+  playRound(game, { alice: 7, bob: 3 });
+  assert.equal(game.status, 'finished');
+  assert.deepEqual(game.validated.chance, [3, 7]);
 });
 
 test('le départ d’un joueur débloque le tour si tous les autres ont choisi', () => {
@@ -213,4 +218,20 @@ test('EuroDreams : 6 numéros de 1 à 40, puis 1 numéro Dream de 1 à 5', () =>
   playRound(game, { alice: 5, bob: 5 });
   assert.equal(game.status, 'finished');
   assert.deepEqual(game.validated, { numbers: [2, 4, 8, 16, 32, 40], dream: [5] });
+});
+
+test('gridCost : grille simple, grille multiple et limites de chaque jeu (règlements FDJ)', () => {
+  const { loto, euromillions, eurodreams } = GAMES;
+  assert.deepEqual(gridCost(loto, 5, 1), { status: 'simple', combinations: 1, price: 2.2 });
+  assert.deepEqual(gridCost(loto, 8, 3), { status: 'multiple', combinations: 168, price: 369.6 });
+  assert.equal(gridCost(loto, 9, 2).status, 'not_allowed');
+  assert.equal(gridCost(loto, 10, 1).status, 'not_allowed');
+  assert.equal(gridCost(loto, 4, 1).status, 'too_few');
+  assert.deepEqual(gridCost(euromillions, 6, 12), { status: 'multiple', combinations: 396, price: 990 });
+  assert.deepEqual(gridCost(euromillions, 10, 2), { status: 'multiple', combinations: 252, price: 630 });
+  assert.equal(gridCost(euromillions, 7, 7).status, 'not_allowed');
+  assert.equal(gridCost(euromillions, 5, 1).status, 'too_few');
+  assert.deepEqual(gridCost(eurodreams, 7, 2), { status: 'multiple', combinations: 14, price: 35 });
+  assert.deepEqual(gridCost(eurodreams, 9, 3), { status: 'multiple', combinations: 252, price: 630 });
+  assert.equal(gridCost(eurodreams, 10, 2).status, 'not_allowed');
 });

@@ -1,5 +1,6 @@
 import { saveToken, loadToken, forgetToken, escapeHtml, formatDrawDate, ball, rulesFor, applyTheme, countLabel, gridBalls } from './common.js';
 import { renderGridAccountOffer } from './account.js';
+import { renderPlayOptions } from './play-options.js';
 
 const roomId = decodeURIComponent(location.pathname.split('/').pop());
 const socket = io({ transports: ['websocket', 'polling'] });
@@ -185,7 +186,8 @@ function renderGame() {
     state.me.pending !== null
       ? `Vous avez choisi le ${state.me.pending}. Vous pouvez changer d'avis jusqu'à la fin du tour.`
       : `Choisissez ${article(phase)} ${phase.one} entre ${phase.min} et ${phase.max} que vous n'avez pas encore choisi${e(phase)}.`;
-  $('collective-hint').textContent = collectiveHint(phase, isBonus, validated);
+  const numbers = rules.phases[0];
+  $('collective-hint').textContent = collectiveHint(phase, isBonus, validated) + overflowNotice(numbers, state.validated[numbers.key]);
   $('collective-hint').hidden = !isBonus;
   renderGrid(phase, isBonus, validated);
 }
@@ -199,7 +201,7 @@ function renderRoundEnd() {
   const phase = rules.phases[phaseIndex];
   const validated = state.validated[phase.key];
   // Le cadre du tour et les consignes gardent leur contenu (masqué) pour que rien ne bouge à l'écran.
-  $('last-round').innerHTML = `<span>${roundResult(last.newlyValidated, phase, phaseIndex > 0)}</span>`;
+  $('last-round').innerHTML = `<span>${roundResult(last.newlyValidated, phase, phaseIndex > 0)}${overflowNotice(phase, validated)}</span>`;
   $('last-round').hidden = false;
   renderGrid(phase, phaseIndex > 0, validated);
 }
@@ -211,6 +213,12 @@ function roundResult(numbers, phase, isBonus) {
   }
   const balls = numbers.map((n) => ball(n, isBonus ? 'bonus' : 'validated')).join(' ');
   return `Fin du tour : ${balls} validé${e(phase)}${numbers.length > 1 ? 's' : ''} par tout le monde !`;
+}
+
+// Plusieurs numéros validés au même tour peuvent dépasser le nombre prévu : on les garde tous.
+function overflowNotice(phase, validated) {
+  if (validated.length <= phase.count) return '';
+  return ` Cela fait ${countLabel(phase, validated.length)} au lieu de ${phase.count} : à la fin, vous pourrez tous les jouer en grille multiple ou en écarter.`;
 }
 
 // Une seule grille réunit ses propres choix et les numéros validés par tout le monde.
@@ -276,6 +284,7 @@ function collectiveHint(phase, isBonus, validated) {
 }
 
 let offerShown = false;
+let optionsShown = false; // rendu une fois : les numéros écartés par le joueur ne sont pas réinitialisés
 
 function renderFinished() {
   show('finished');
@@ -283,6 +292,10 @@ function renderFinished() {
   const [numbers, bonus] = rules.phases;
   $('finished-title').textContent = `Votre grille ${rules.name} est prête ! 🎉`;
   $('final-grid').innerHTML = gridBalls(state.validated[numbers.key], state.validated[bonus.key]);
+  if (!optionsShown) {
+    optionsShown = true;
+    $('final-grid').hidden = renderPlayOptions($('play-options'), rules, state.validated);
+  }
   const url = `${location.origin}/grille/${encodeURIComponent(roomId)}`;
   $('grid-link').href = url;
   $('grid-link').textContent = url;

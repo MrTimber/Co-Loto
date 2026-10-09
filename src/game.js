@@ -85,7 +85,7 @@ export function startGame(game, playerId) {
 
 // Enregistre (ou remplace) le choix du joueur pour le tour en cours.
 // Quand tous les joueurs ont choisi, le tour est évalué.
-export function pick(game, playerId, number, rng = Math.random) {
+export function pick(game, playerId, number) {
   if (game.status !== 'playing') throw new GameError('not_playing', "La partie n'est pas en cours.");
   const player = findPlayer(game, playerId);
   if (!player) throw new GameError('not_a_player', 'Vous ne participez pas à cette partie.');
@@ -97,10 +97,10 @@ export function pick(game, playerId, number, rng = Math.random) {
     throw new GameError('already_picked', 'Vous avez déjà choisi ce numéro.');
   }
   player.pending = number;
-  return maybeEndRound(game, rng);
+  return maybeEndRound(game);
 }
 
-export function removePlayer(game, playerId, rng = Math.random) {
+export function removePlayer(game, playerId) {
   const index = game.players.findIndex((p) => p.id === playerId);
   if (index === -1) return null;
   game.players.splice(index, 1);
@@ -110,17 +110,17 @@ export function removePlayer(game, playerId, rng = Math.random) {
       game.status = 'abandoned';
       return null;
     }
-    return maybeEndRound(game, rng);
+    return maybeEndRound(game);
   }
   return null;
 }
 
-function maybeEndRound(game, rng) {
+function maybeEndRound(game) {
   if (game.players.some((p) => p.pending === null)) return null;
-  return endRound(game, rng);
+  return endRound(game);
 }
 
-function endRound(game, rng) {
+function endRound(game) {
   const phase = game.phase;
   const roundPicks = {};
   for (const player of game.players) {
@@ -132,10 +132,10 @@ function endRound(game, rng) {
   const validated = game.validated[phase];
   const candidates = commonPicks(game.players, phase).filter((n) => !validated.includes(n));
   const { count } = phaseRules(game);
-  const slots = count - validated.length;
-  // Plusieurs numéros peuvent devenir unanimes au même tour : s'il y en a plus
-  // que de places restantes, un tirage au sort départage les candidats.
-  const newlyValidated = candidates.length > slots ? shuffle(candidates, rng).slice(0, slots) : candidates;
+  // Plusieurs numéros peuvent devenir unanimes au même tour : ils sont tous gardés, même
+  // au-delà du nombre prévu. Les joueurs choisiront à la fin de jouer une grille multiple
+  // ou d'écarter les numéros en trop.
+  const newlyValidated = candidates;
   validated.push(...newlyValidated);
   validated.sort((a, b) => a - b);
 
@@ -166,15 +166,6 @@ export function commonPicks(players, phase) {
   if (players.length === 0) return [];
   const [first, ...others] = players;
   return first.picks[phase].filter((n) => others.every((p) => p.picks[phase].includes(n))).sort((a, b) => a - b);
-}
-
-function shuffle(list, rng) {
-  const copy = [...list];
-  for (let i = copy.length - 1; i > 0; i--) {
-    const j = Math.floor(rng() * (i + 1));
-    [copy[i], copy[j]] = [copy[j], copy[i]];
-  }
-  return copy;
 }
 
 // Vue de la partie envoyée à un joueur : les choix des autres restent secrets.

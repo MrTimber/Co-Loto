@@ -329,3 +329,10 @@ form label.game-option {
 .profile input[type=checkbox] { width: auto; margin-top: .3rem; flex: none; }
 .danger-zone { margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--border); text-align: center; }
 button.link.danger { color: var(--danger); }
+
+/* Numéros en surnombre : chacun choisit ceux qu'il jouera (tous en grille multiple, ou une grille simple). */
+.play-options .summary.big { margin-bottom: .75rem; }
+button.ball.toggle { padding: 0; border: 0; line-height: 1; }
+button.ball.toggle[aria-pressed=false] { opacity: .3; text-decoration: line-through; }
+.play-status { font-weight: 600; }
+.play-status.warn { background: var(--pending-soft); border-radius: var(--radius); padding: .5rem .75rem; }
