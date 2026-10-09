@@ -21,9 +21,9 @@ export function openStore(file = ':memory:') {
     )
   `);
   // Colonnes ajoutées avec l'Euromillions et EuroDreams : les grilles plus anciennes sont des grilles de Loto.
-  const columns = db.prepare('PRAGMA table_info(grids)').all().map((c) => c.name);
-  if (!columns.includes('game_type')) db.exec("ALTER TABLE grids ADD COLUMN game_type TEXT NOT NULL DEFAULT 'loto'");
-  if (!columns.includes('bonus')) db.exec('ALTER TABLE grids ADD COLUMN bonus TEXT');
+  const columns = new Set(db.prepare('PRAGMA table_info(grids)').all().map((c) => c.name));
+  if (!columns.has('game_type')) db.exec("ALTER TABLE grids ADD COLUMN game_type TEXT NOT NULL DEFAULT 'loto'");
+  if (!columns.has('bonus')) db.exec('ALTER TABLE grids ADD COLUMN bonus TEXT');
   const insert = db.prepare(`
     INSERT OR REPLACE INTO grids (id, created_at, expires_at, draw_date, game_type, numbers, bonus, chance, players, rounds)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
