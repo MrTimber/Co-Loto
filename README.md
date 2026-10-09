@@ -169,7 +169,7 @@ Le fichier [`render.yaml`](render.yaml) du dépôt décrit déjà toute la confi
 
 1. Dans le tableau de bord Render, cliquez sur **New** puis **Blueprint**. Avec un compte tout neuf, Render ouvre d'abord l'assistant « Create a new Service », qui ne propose pas le Blueprint : cliquez sur **Skip** pour revenir au tableau de bord, où le bouton **New** est disponible.
 2. Choisissez le dépôt `MrTimber/Co-Loto` dans la liste (cliquez sur **Connect**).
-3. Donnez un nom au Blueprint (par exemple `co-loto`) et laissez la branche sur `main`. Render affiche le service web `co-loto` trouvé dans `render.yaml`, avec l'offre **Free**.
+3. Donnez un nom au Blueprint (par exemple `co-loto`) et laissez la branche sur `main`. Render affiche le service web `co-loto` trouvé dans `render.yaml`, avec l'offre **Free** et la région **Frankfurt**.
 4. Vérifiez la liste des ressources que Render va créer, puis cliquez sur **Deploy Blueprint**. Render installe les dépendances et démarre le site en quelques minutes.
 5. Ouvrez le service `co-loto` : son adresse publique s'affiche en haut de la page, sous la forme `https://co-loto-xxxx.onrender.com`. C'est l'adresse à partager.
 
@@ -187,6 +187,7 @@ Le fichier [`render.yaml`](render.yaml) du dépôt décrit déjà toute la confi
    | Root Directory | _(laisser vide)_ |
    | Build Command | `npm ci --omit=dev` |
    | Start Command | `npm start` |
+   | Region | **Frankfurt (EU Central)** |
    | Instance Type | **Free** |
 
 4. Dans **Environment Variables**, ajoutez `NODE_VERSION` avec la valeur `22` (Co-Loto a besoin de Node.js 22.13 ou plus).
@@ -243,7 +244,7 @@ Co-Loto demande à chaque service l'accès à l'adresse email, pour pouvoir envo
 
 Le disque de l'offre gratuite de Render est effacé à chaque redéploiement ou mise en veille (voir plus bas). Pour que les grilles, les comptes et « Mes grilles » soient conservés, Co-Loto utilise une base [Turso](https://turso.tech/) gratuite (SQLite hébergé) dès que ses deux variables sont définies :
 
-1. Sur [app.turso.tech](https://app.turso.tech/), créez une base (**Create Database**), par exemple `co-loto`, dans la région la plus proche de celle du service Render (Francfort si le service est à Francfort).
+1. Sur [app.turso.tech](https://app.turso.tech/), créez une base (**Create Database**), par exemple `co-loto`, dans la région la plus proche de celle du service Render : **Europe (Ireland)** pour un service à Francfort, comme celui décrit par `render.yaml`.
 2. Sur la page de la base, copiez son **URL** (de la forme `libsql://co-loto-xxxx.turso.io`), puis cliquez sur **Create Token** et copiez le jeton (lecture et écriture, sans date d'expiration ou avec une date lointaine).
 3. Dans Render, page du service > **Environment** > **Add Environment Variable** : ajoutez `TURSO_DATABASE_URL` avec l'URL et `TURSO_AUTH_TOKEN` avec le jeton, puis **Save Changes**. Render redéploie le site.
 
