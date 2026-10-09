@@ -5,7 +5,7 @@ const form = document.getElementById('create-form');
 const errorBox = document.getElementById('create-error');
 const select = form.elements.maxPlayers;
 
-for (let n = 2; n <= 12; n++) select.add(new Option(`${n} joueurs`, n, n === 3, n === 3));
+for (let n = 2; n <= 12; n++) select.add(new Option(`${n} joueurs`, n, n === 12, n === 12));
 form.elements.name.value = localStorage.getItem('coloto:name') ?? '';
 
 const monthFormat = new Intl.DateTimeFormat('fr-FR', { month: 'long', year: 'numeric', timeZone: 'UTC' });

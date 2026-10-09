@@ -16,7 +16,7 @@ Chaque joueur choisit des numéros dans sa grille personnelle. Un numéro n'entr
 - L'accès au salon peut être :
   - **public** ;
   - **privé**, sur invitation (chat, email ou lien privé).
-- Le nombre maximum de joueurs est compris entre **2 et 12** (**3 par défaut**).
+- Le nombre maximum de joueurs est compris entre **2 et 12** (**12 par défaut**).
 - Le créateur peut indiquer, de façon optionnelle, **la date du tirage** auquel il prévoit de jouer la grille.
 
 ### 2. Lancement
