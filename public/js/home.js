@@ -64,6 +64,11 @@ form.addEventListener('submit', async (event) => {
   }
 });
 
+function lobbyBadge(gameType) {
+  const rules = GAMES[gameType];
+  return rules ? `<span class="game-badge" data-game="${rules.id}">${escapeHtml(rules.name)}</span> ` : '';
+}
+
 async function refreshLobbies() {
   const list = document.getElementById('lobbies');
   try {
@@ -72,7 +77,7 @@ async function refreshLobbies() {
       ? lobbies
           .map(
             (l) => `<li><a href="/salon/${encodeURIComponent(l.id)}">
-              <strong>${escapeHtml(GAMES[l.gameType]?.name ?? '')} · salon de ${escapeHtml(l.host)}</strong>
+              <strong>${lobbyBadge(l.gameType)}salon de ${escapeHtml(l.host)}</strong>
               <span>${l.players}/${l.maxPlayers} joueurs${l.drawDate ? ` · tirage du ${formatDrawDate(l.drawDate)}` : ''}</span>
             </a></li>`,
           )
