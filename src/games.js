@@ -7,6 +7,7 @@ export const GAMES = {
     id: 'loto',
     name: 'Loto',
     theName: 'Le Loto',
+    ofName: 'de Loto',
     drawWeekdays: [1, 3, 6],
     drawDays: 'le lundi, le mercredi et le samedi',
     phases: [
@@ -18,6 +19,7 @@ export const GAMES = {
     id: 'euromillions',
     name: 'Euromillions',
     theName: "L'Euromillions",
+    ofName: "d'Euromillions",
     drawWeekdays: [2, 5],
     drawDays: 'le mardi et le vendredi',
     phases: [
@@ -29,6 +31,7 @@ export const GAMES = {
     id: 'eurodreams',
     name: 'EuroDreams',
     theName: 'EuroDreams',
+    ofName: "d'EuroDreams",
     drawWeekdays: [1, 4],
     drawDays: 'le lundi et le jeudi',
     phases: [

@@ -67,7 +67,7 @@ $('join-form').elements.name.value = localStorage.getItem('coloto:name') ?? '';
 
 const inviteUrl = `${location.origin}/salon/${encodeURIComponent(roomId)}`;
 $('invite-link').value = inviteUrl;
-const inviteText = (rules) => `Viens co-créer une grille ${rules.id === 'loto' ? 'de Loto' : rules.id === 'euromillions' ? "d'Euromillions" : "d'EuroDreams"} avec moi`;
+const inviteText = (rules) => `Viens co-créer une grille ${rules.ofName} avec moi`;
 $('copy-link').addEventListener('click', async () => {
   try {
     await navigator.clipboard.writeText(inviteUrl);
@@ -115,10 +115,20 @@ function playerList(players, { showPick }) {
       if (p.id === state.hostId) tags.push('<span class="tag">créateur</span>');
       if (p.id === state.me.id) tags.push('<span class="tag">vous</span>');
       if (!p.online) tags.push('<span class="tag warn">hors ligne</span>');
-      const status = showPick ? `<span class="pick-status ${p.hasPicked ? 'done' : ''}">${p.hasPicked ? 'a choisi' : 'réfléchit…'}</span>` : '';
+      const status = showPick ? pickStatus(p.hasPicked) : '';
       return `<li>${escapeHtml(p.name)} ${tags.join(' ')} ${status}</li>`;
     })
     .join('');
+}
+
+function pickStatus(hasPicked) {
+  return hasPicked ? '<span class="pick-status done">a choisi</span>' : '<span class="pick-status">réfléchit…</span>';
+}
+
+function lobbyHint(isHost) {
+  if (!isHost) return 'En attente du lancement de la partie par le créateur du salon.';
+  if (state.players.length < 2) return 'Invitez au moins une personne pour lancer la partie.';
+  return 'Vous pouvez lancer la partie quand tout le monde est là.';
 }
 
 function renderLobby() {
@@ -133,11 +143,7 @@ function renderLobby() {
   $('lobby-players').innerHTML = playerList(state.players, { showPick: false });
   $('start-game').hidden = !isHost;
   $('start-game').disabled = state.players.length < 2;
-  $('lobby-hint').textContent = isHost
-    ? state.players.length < 2
-      ? 'Invitez au moins une personne pour lancer la partie.'
-      : 'Vous pouvez lancer la partie quand tout le monde est là.'
-    : 'En attente du lancement de la partie par le créateur du salon.';
+  $('lobby-hint').textContent = lobbyHint(isHost);
 }
 
 function renderGame() {
@@ -148,7 +154,8 @@ function renderGame() {
   const validated = state.validated[phase.key];
   const waiting = state.players.filter((p) => !p.hasPicked).length;
   $('round-label').textContent = `${rules.name} · Tour ${state.round} · ${capitalize(phase.many)} (${validated.length}/${phase.count})`;
-  $('round-hint').textContent = waiting ? ` · en attente de ${waiting} joueur${waiting > 1 ? 's' : ''}` : '';
+  const waitingFor = waiting > 1 ? `${waiting} joueurs` : '1 joueur';
+  $('round-hint').textContent = waiting ? ` · en attente de ${waitingFor}` : '';
   $('game-players').innerHTML = playerList(state.players, { showPick: true });
 
   const last = state.lastRound;
@@ -164,7 +171,7 @@ function renderGame() {
   $('personal-hint').textContent =
     state.me.pending !== null
       ? `Vous avez choisi le ${state.me.pending}. Vous pouvez changer d'avis jusqu'à la fin du tour.`
-      : `Choisissez ${phase.feminine ? 'une' : 'un'} ${phase.one} entre ${phase.min} et ${phase.max} que vous n'avez pas encore choisi${e(phase)}.`;
+      : `Choisissez ${article(phase)} ${phase.one} entre ${phase.min} et ${phase.max} que vous n'avez pas encore choisi${e(phase)}.`;
   const grid = $('personal-grid');
   setupGrid(grid, phase, isBonus);
   grid.innerHTML = range(phase.min, phase.max)
@@ -178,7 +185,7 @@ function renderGame() {
     })
     .join('');
 
-  renderCollective(rules, phase, isBonus, validated);
+  renderCollective(phase, isBonus, validated);
 }
 
 function setupGrid(grid, phase, isBonus) {
@@ -187,19 +194,23 @@ function setupGrid(grid, phase, isBonus) {
 }
 
 // La grille collective n'affiche que la phase en cours : les numéros, puis les numéros complémentaires.
-function renderCollective(rules, phase, isBonus, validated) {
-  const remaining = phase.count - validated.length;
-  $('collective-hint').textContent = isBonus
-    ? remaining > 1
-      ? `Les ${countLabel(phase, remaining)} validé${e(phase)}s par tout le monde termineront la grille.`
-      : `${phase.count > 1 ? (phase.feminine ? 'La dernière' : 'Le dernier') : phase.feminine ? 'La' : 'Le'} ${phase.one} validé${e(phase)} par tout le monde terminera la grille.`
-    : `${capitalize(phase.many)} validés par tout le monde : ${validated.length} sur ${phase.count}.`;
+function renderCollective(phase, isBonus, validated) {
+  $('collective-hint').textContent = collectiveHint(phase, isBonus, validated);
   const grid = $('collective-grid');
   setupGrid(grid, phase, isBonus);
   const validatedClass = isBonus ? 'bonus-validated' : 'validated';
   grid.innerHTML = range(phase.min, phase.max)
     .map((n) => `<span class="cell ${validated.includes(n) ? validatedClass : ''}">${n}</span>`)
     .join('');
+}
+
+function collectiveHint(phase, isBonus, validated) {
+  if (!isBonus) return `${capitalize(phase.many)} validés par tout le monde : ${validated.length} sur ${phase.count}.`;
+  const remaining = phase.count - validated.length;
+  if (remaining > 1) return `Les ${countLabel(phase, remaining)} validé${e(phase)}s par tout le monde termineront la grille.`;
+  let subject = phase.feminine ? 'La' : 'Le';
+  if (phase.count > 1) subject = phase.feminine ? 'La dernière' : 'Le dernier';
+  return `${subject} ${phase.one} validé${e(phase)} par tout le monde terminera la grille.`;
 }
 
 function renderFinished() {
@@ -218,6 +229,7 @@ $('personal-grid').addEventListener('click', (event) => {
 });
 
 const e = (phase) => (phase.feminine ? 'e' : '');
+const article = (phase) => (phase.feminine ? 'une' : 'un');
 const capitalize = (text) => text[0].toUpperCase() + text.slice(1);
 
 function range(min, max) {

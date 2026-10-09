@@ -40,7 +40,8 @@ export function countLabel(phase, n = phase.count) {
 // « 5 numéros, puis le numéro chance », « 5 numéros, puis 2 étoiles »…
 export function describeGame(rules) {
   const [numbers, bonus] = rules.phases;
-  return `${countLabel(numbers)}, puis ${bonus.count === 1 ? `le ${bonus.one}` : countLabel(bonus)}`;
+  const bonusLabel = bonus.count === 1 ? 'le ' + bonus.one : countLabel(bonus);
+  return `${countLabel(numbers)}, puis ${bonusLabel}`;
 }
 
 export function gridBalls(numbers, bonus) {
