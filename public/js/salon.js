@@ -225,6 +225,33 @@ function renderFinished() {
   $('grid-link').textContent = url;
 }
 
+const gridUrl = () => $('grid-link').href;
+
+async function copyGridLink() {
+  try {
+    await navigator.clipboard.writeText(gridUrl());
+    $('grid-link-status').textContent = 'Lien copié ! Collez-le où vous voulez pour le partager.';
+  } catch {
+    // Presse-papiers indisponible (contexte non sécurisé, refus…) : on sélectionne le lien pour une copie manuelle.
+    getSelection().selectAllChildren($('grid-link'));
+    $('grid-link-status').textContent = 'Le lien est sélectionné : copiez-le avec Ctrl+C (ou un appui long).';
+  }
+}
+
+$('copy-grid-link').addEventListener('click', copyGridLink);
+if (navigator.share) {
+  $('share-grid').hidden = false;
+  $('share-grid').addEventListener('click', async () => {
+    const rules = rulesFor(state.gameType);
+    try {
+      await navigator.share({ title: 'Co-Loto', text: `Notre grille ${rules.name} co-créée sur Co-Loto`, url: gridUrl() });
+      $('grid-link-status').textContent = 'Lien partagé !';
+    } catch (err) {
+      if (err.name !== 'AbortError') await copyGridLink();
+    }
+  });
+}
+
 $('personal-grid').addEventListener('click', (event) => {
   const cell = event.target.closest('button[data-number]');
   if (!cell || cell.disabled) return;
