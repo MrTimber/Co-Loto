@@ -155,3 +155,20 @@ test('les règles des jeux sont servies au navigateur', async () => {
 test('une grille inconnue renvoie 404', async () => {
   assert.equal((await api('/api/grilles/inconnue')).status, 404);
 });
+
+test("l'application est installable : manifeste, icônes et service worker", async () => {
+  const res = await fetch(`${baseUrl}/manifest.webmanifest`);
+  assert.equal(res.status, 200);
+  assert.match(res.headers.get('content-type'), /^application\/manifest\+json/);
+  const manifest = await res.json();
+  assert.equal(manifest.display, 'standalone');
+  assert.equal(manifest.start_url, '/');
+  for (const icon of manifest.icons) assert.equal((await fetch(baseUrl + icon.src)).status, 200, icon.src);
+  assert.ok(manifest.icons.some((icon) => icon.sizes === '512x512' && icon.purpose === 'maskable'));
+
+  const sw = await fetch(`${baseUrl}/sw.js`);
+  assert.equal(sw.status, 200);
+  assert.match(sw.headers.get('content-type'), /javascript/);
+  assert.equal((await fetch(`${baseUrl}/hors-ligne.html`)).status, 200);
+  assert.equal((await fetch(`${baseUrl}/icons/apple-touch-icon.png`)).status, 200);
+});
