@@ -69,15 +69,31 @@ h2 { font-size: 1.15rem; margin: 0 0 .75rem; }
 
 .site-header {
   display: flex;
-  justify-content: space-between;
+  gap: 1rem;
   align-items: center;
   padding: .75rem 1rem;
   border-bottom: 1px solid var(--border);
   background: var(--surface);
 }
-.logo { font-weight: 800; font-size: 1.3rem; text-decoration: none; color: var(--accent); }
-.brand { display: flex; align-items: center; gap: .6rem; }
-.brand .game-badge { margin: 0; }
+.logo { margin-right: auto; display: flex; }
+.logo img { display: block; height: 48px; width: auto; }
+
+/* Écran d'accueil (voir js/splash.js) */
+.splash {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 1.5rem;
+  background: #fff;
+  cursor: pointer;
+  transition: opacity .4s;
+}
+.splash img { width: 100%; max-width: 560px; height: auto; }
+.splash.hide { opacity: 0; }
+@media (prefers-reduced-motion: reduce) { .splash { transition: none; } }
+.site-header .game-badge { order: 1; margin: 0; }
 .site-footer { margin-top: auto; padding: 1.5rem 1rem; text-align: center; font-size: .85rem; color: var(--on-theme); opacity: .85; }
 .site-footer a { color: inherit; }
 
