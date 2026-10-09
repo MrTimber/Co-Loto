@@ -71,18 +71,16 @@
       </div>
       <p id="last-round" class="banner" hidden></p>
       <p class="error" id="game-error" role="alert"></p>
-      <div class="grids">
-        <section class="card">
-          <h2>Ma grille</h2>
-          <p class="muted small" id="personal-hint"></p>
-          <div id="personal-grid" class="grid"></div>
-        </section>
-        <section class="card">
-          <h2>Grille collective</h2>
-          <p class="muted small" id="collective-hint"></p>
-          <div id="collective-grid" class="grid"></div>
-        </section>
-      </div>
+      <section class="card game-grid">
+        <p class="small" id="grid-hint"></p>
+        <p class="muted small" id="collective-hint"></p>
+        <div id="grid" class="grid"></div>
+        <ul class="legend small muted">
+          <li><span class="cell pending" aria-hidden="true"></span> ce tour</li>
+          <li><span class="cell picked" aria-hidden="true"></span> déjà choisi</li>
+          <li><span class="cell validated" aria-hidden="true"><span class="check">✓</span></span> validé par tous</li>
+        </ul>
+      </section>
     </section>
 
     <section id="view-finished" class="card narrow" hidden>

@@ -167,45 +167,74 @@ function renderGame() {
   }
 
   const isBonus = phaseIndex > 0;
-  const mine = state.me.picks[phase.key];
-  $('personal-hint').textContent =
+  $('grid-hint').textContent =
     state.me.pending !== null
       ? `Vous avez choisi le ${state.me.pending}. Vous pouvez changer d'avis jusqu'à la fin du tour.`
       : `Choisissez ${article(phase)} ${phase.one} entre ${phase.min} et ${phase.max} que vous n'avez pas encore choisi${e(phase)}.`;
-  const grid = $('personal-grid');
-  setupGrid(grid, phase, isBonus);
-  grid.innerHTML = range(phase.min, phase.max)
-    .map((n) => {
-      const classes = ['cell'];
-      if (mine.includes(n)) classes.push('picked');
-      if (validated.includes(n)) classes.push('validated');
-      if (state.me.pending === n) classes.push('pending');
-      const disabled = mine.includes(n) ? 'disabled' : '';
-      return `<button type="button" class="${classes.join(' ')}" data-number="${n}" ${disabled} aria-pressed="${state.me.pending === n}">${n}</button>`;
-    })
-    .join('');
-
-  renderCollective(phase, isBonus, validated);
-}
-
-function setupGrid(grid, phase, isBonus) {
-  grid.classList.toggle('bonus', isBonus);
-  grid.style.setProperty('--columns', phase.columns);
-}
-
-// La grille collective n'affiche que la phase en cours : les numéros, puis les numéros complémentaires.
-function renderCollective(phase, isBonus, validated) {
   $('collective-hint').textContent = collectiveHint(phase, isBonus, validated);
-  const grid = $('collective-grid');
-  setupGrid(grid, phase, isBonus);
-  const validatedClass = isBonus ? 'bonus-validated' : 'validated';
-  grid.innerHTML = range(phase.min, phase.max)
-    .map((n) => `<span class="cell ${validated.includes(n) ? validatedClass : ''}">${n}</span>`)
-    .join('');
+  $('collective-hint').hidden = !isBonus;
+  renderGrid(phase, isBonus, validated);
 }
 
+// Une seule grille réunit ses propres choix et les numéros validés par tout le monde.
+// Elle n'affiche que la phase en cours : les numéros, puis les numéros complémentaires.
+// Les cases sont créées une fois par phase puis mises à jour, pour que l'animation
+// d'un numéro qui vient d'être validé ne se rejoue pas à chaque mise à jour du salon.
+let gridPhase = null;
+let seenValidated = new Set();
+
+function renderGrid(phase, isBonus, validated) {
+  const grid = $('grid');
+  if (gridPhase !== phase.key) {
+    gridPhase = phase.key;
+    seenValidated = new Set(validated);
+    grid.closest('.game-grid').classList.toggle('bonus', isBonus);
+    grid.classList.toggle('bonus', isBonus);
+    grid.style.setProperty('--columns', phase.columns);
+    grid.replaceChildren(...range(phase.min, phase.max).map(createCell));
+  }
+  const mine = state.me.picks[phase.key];
+  for (const cell of grid.children) {
+    const n = Number(cell.dataset.number);
+    const isValidated = validated.includes(n);
+    const isPicked = mine.includes(n) && !isValidated;
+    const isPending = state.me.pending === n;
+    cell.classList.toggle('picked', isPicked);
+    cell.classList.toggle('validated', isValidated);
+    cell.classList.toggle('pending', isPending);
+    cell.disabled = isPicked || isValidated;
+    cell.setAttribute('aria-pressed', String(isPending));
+    cell.setAttribute('aria-label', cellLabel(n, isValidated, isPicked));
+    if (isValidated && !seenValidated.has(n)) {
+      seenValidated.add(n);
+      cell.classList.add('just-validated');
+    }
+  }
+}
+
+function createCell(n) {
+  const cell = document.createElement('button');
+  cell.type = 'button';
+  cell.className = 'cell';
+  cell.dataset.number = n;
+  const check = document.createElement('span');
+  check.className = 'check';
+  check.setAttribute('aria-hidden', 'true');
+  check.textContent = '✓';
+  cell.append(String(n), check);
+  cell.addEventListener('animationend', () => cell.classList.remove('just-validated'));
+  return cell;
+}
+
+function cellLabel(n, isValidated, isPicked) {
+  if (isValidated) return `${n}, validé par tout le monde`;
+  if (isPicked) return `${n}, déjà choisi`;
+  return String(n);
+}
+
+// Pendant les numéros, le compteur du bandeau de tour suffit : le rappel ne sert qu'aux numéros complémentaires.
 function collectiveHint(phase, isBonus, validated) {
-  if (!isBonus) return `${capitalize(phase.many)} validés par tout le monde : ${validated.length} sur ${phase.count}.`;
+  if (!isBonus) return '';
   const remaining = phase.count - validated.length;
   if (remaining > 1) return `Les ${countLabel(phase, remaining)} validé${e(phase)}s par tout le monde termineront la grille.`;
   let subject = phase.feminine ? 'La' : 'Le';
@@ -252,7 +281,7 @@ if (navigator.share) {
   });
 }
 
-$('personal-grid').addEventListener('click', (event) => {
+$('grid').addEventListener('click', (event) => {
   const cell = event.target.closest('button[data-number]');
   if (!cell || cell.disabled) return;
   act('game:pick', { number: Number(cell.dataset.number) }, 'game-error');
