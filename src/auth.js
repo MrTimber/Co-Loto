@@ -27,7 +27,7 @@ export const PROVIDERS = {
   google: {
     label: 'Google',
     envPrefix: 'GOOGLE',
-    server: { discovery: 'https://accounts.google.com' },
+    server: { discovery: () => 'https://accounts.google.com' },
     scopes: 'openid email',
     profile: async (tokens) => {
       const claims = tokens.claims();
@@ -160,7 +160,7 @@ export function createAuth({ store, env = process.env, findRoomId = () => undefi
       const clientId = env[`${envPrefix}_CLIENT_ID`];
       const secret = env[`${envPrefix}_CLIENT_SECRET`];
       const ready = server.discovery
-        ? oidc.discovery(new URL(typeof server.discovery === 'function' ? server.discovery(env) : server.discovery), clientId, secret)
+        ? oidc.discovery(new URL(server.discovery(env)), clientId, secret)
         : Promise.resolve(new oidc.Configuration(server, clientId, secret));
       configurations.set(providerId, ready.catch((err) => {
         configurations.delete(providerId);
