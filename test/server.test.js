@@ -10,7 +10,7 @@ let rooms;
 const clients = [];
 
 before(async () => {
-  const created = createApp({ store: openStore(), offlineGraceMs: 200 });
+  const created = createApp({ store: await openStore(), offlineGraceMs: 200 });
   server = created.httpServer;
   rooms = created.rooms;
   await new Promise((resolve) => server.listen(0, resolve));

@@ -8,11 +8,12 @@
     "node": ">=22.13"
   },
   "scripts": {
-    "start": "node --disable-warning=ExperimentalWarning src/index.js",
-    "dev": "node --disable-warning=ExperimentalWarning --watch src/index.js",
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
     "test": "node --disable-warning=ExperimentalWarning --test"
   },
   "dependencies": {
+    "@libsql/client": "^0.18.0",
     "express": "^5.2.1",
     "openid-client": "^6.8.8",
     "socket.io": "^4.8.4"

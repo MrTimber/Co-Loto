@@ -10,3 +10,8 @@ services:
     envVars:
       - key: NODE_VERSION
         value: "22"
+      # Base Turso (voir le README) : valeurs à saisir dans Render, jamais dans le dépôt.
+      - key: TURSO_DATABASE_URL
+        sync: false
+      - key: TURSO_AUTH_TOKEN
+        sync: false
