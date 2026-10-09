@@ -1,8 +1,28 @@
-import { escapeHtml, formatDrawDate, rulesFor, applyTheme, gridBalls } from './common.js';
+import { formatDrawDate, rulesFor, applyTheme } from './common.js';
 
 const id = decodeURIComponent(location.pathname.split('/').pop());
 const card = document.getElementById('grid-card');
 const dateFormat = { day: 'numeric', month: 'long', year: 'numeric' };
+
+// La page est construite nœud par nœud : aucune donnée reçue n'est interprétée comme du HTML.
+function el(tag, className, ...children) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  node.append(...children);
+  return node;
+}
+
+function balls(numbers, extra) {
+  return numbers.map((n) => el('span', `ball ${extra}`, String(n)));
+}
+
+function listNames(names) {
+  const bold = names.map((n) => el('strong', '', n));
+  return bold.flatMap((node, i) => {
+    if (i === 0) return [node];
+    return [i === bold.length - 1 ? ' et ' : ', ', node];
+  });
+}
 
 try {
   const res = await fetch(`/api/grilles/${encodeURIComponent(id)}`);
@@ -12,18 +32,16 @@ try {
   applyTheme(rules.id);
   const created = new Date(body.createdAt).toLocaleDateString('fr-FR', dateFormat);
   const expires = new Date(body.expiresAt).toLocaleDateString('fr-FR', dateFormat);
-  card.innerHTML = `
-    <p class="game-badge">${rules.name}</p>
-    <h1>Grille co-créée</h1>
-    <div class="summary big">${gridBalls(body.numbers, body.bonus)}</div>
-    <p>Choisie par ${listNames(body.players)} en ${body.rounds} tours, le ${created}.</p>
-    ${body.drawDate ? `<p>Tirage prévu : ${formatDrawDate(body.drawDate)}. La vérification des résultats arrivera dans une prochaine version.</p>` : ''}
-    <p class="muted small">Cette page reste consultable jusqu'au ${expires}.</p>`;
+  card.replaceChildren(
+    el('p', 'game-badge', rules.name),
+    el('h1', '', 'Grille co-créée'),
+    el('div', 'summary big', ...balls(body.numbers, 'validated'), ...balls(body.bonus, 'bonus')),
+    el('p', '', 'Choisie par ', ...listNames(body.players), ` en ${body.rounds} tours, le ${created}.`),
+  );
+  if (body.drawDate) {
+    card.append(el('p', '', `Tirage prévu : ${formatDrawDate(body.drawDate)}. La vérification des résultats arrivera dans une prochaine version.`));
+  }
+  card.append(el('p', 'muted small', `Cette page reste consultable jusqu'au ${expires}.`));
 } catch (err) {
-  card.innerHTML = `<h1>Grille introuvable</h1><p class="muted">${escapeHtml(err.message || 'Impossible de charger la grille.')}</p>`;
-}
-
-function listNames(names) {
-  const bold = names.map((n) => `<strong>${escapeHtml(n)}</strong>`);
-  return bold.length > 1 ? `${bold.slice(0, -1).join(', ')} et ${bold.at(-1)}` : bold.join('');
+  card.replaceChildren(el('h1', '', 'Grille introuvable'), el('p', 'muted', err.message || 'Impossible de charger la grille.'));
 }
