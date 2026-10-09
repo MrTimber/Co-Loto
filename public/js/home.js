@@ -62,5 +62,5 @@ async function refreshLobbies() {
   }
 }
 
-refreshLobbies();
+await refreshLobbies();
 setInterval(refreshLobbies, 5000);

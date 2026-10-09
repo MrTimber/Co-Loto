@@ -24,6 +24,23 @@ const GAMES_MODULE = fileURLToPath(new URL('./games.js', import.meta.url));
 
 const newId = (bytes) => randomBytes(bytes).toString('base64url');
 
+function isOnline(room, playerId) {
+  for (const socket of room.sockets) if (socket.data.playerId === playerId) return true;
+  return false;
+}
+
+// Exécute une action et renvoie le résultat (ou l'erreur) via l'accusé de réception.
+function handle(ack, action) {
+  const reply = typeof ack === 'function' ? ack : () => {};
+  try {
+    const result = action();
+    reply({ ok: true, ...result });
+  } catch (err) {
+    if (!(err instanceof GameError)) console.error(err);
+    reply(err instanceof GameError ? { ok: false, code: err.code, error: err.message } : { ok: false, error: 'Erreur inattendue.' });
+  }
+}
+
 export function createApp({
   store,
   offlineGraceMs = 90_000,
@@ -95,11 +112,6 @@ export function createApp({
     // Le joueur doit se connecter en temps réel avant la fin du délai de grâce.
     scheduleOfflineRemoval(room, playerId);
     return { playerId, token };
-  }
-
-  function isOnline(room, playerId) {
-    for (const socket of room.sockets) if (socket.data.playerId === playerId) return true;
-    return false;
   }
 
   function scheduleOfflineRemoval(room, playerId) {
@@ -177,17 +189,6 @@ export function createApp({
     broadcast(room);
   }
 
-  // Exécute une action et renvoie le résultat (ou l'erreur) via l'accusé de réception.
-  function handle(socket, ack, action) {
-    const reply = typeof ack === 'function' ? ack : () => {};
-    try {
-      reply({ ok: true, ...(action() ?? {}) });
-    } catch (err) {
-      if (!(err instanceof GameError)) console.error(err);
-      reply(err instanceof GameError ? { ok: false, code: err.code, error: err.message } : { ok: false, error: 'Erreur inattendue.' });
-    }
-  }
-
   function currentRoom(socket) {
     const room = rooms.get(socket.data.roomId);
     if (!room || !socket.data.playerId) throw new GameError('no_room', "Vous n'êtes dans aucun salon.");
@@ -198,7 +199,7 @@ export function createApp({
     socket.data = {};
 
     socket.on('room:join', (payload, ack) =>
-      handle(socket, ack, () => {
+      handle(ack, () => {
         const { roomId, token, name } = payload ?? {};
         const room = rooms.get(roomId);
         if (!room) throw new GameError('room_not_found', "Ce salon n'existe pas ou n'est plus ouvert.");
@@ -221,7 +222,7 @@ export function createApp({
     );
 
     socket.on('game:start', (ack) =>
-      handle(socket, ack, () => {
+      handle(ack, () => {
         const room = currentRoom(socket);
         startGame(room.game, socket.data.playerId);
         afterChange(room);
@@ -229,7 +230,7 @@ export function createApp({
     );
 
     socket.on('game:pick', (payload, ack) =>
-      handle(socket, ack, () => {
+      handle(ack, () => {
         const room = currentRoom(socket);
         pick(room.game, socket.data.playerId, payload?.number, rng);
         afterChange(room);
@@ -237,10 +238,10 @@ export function createApp({
     );
 
     socket.on('room:leave', (ack) =>
-      handle(socket, ack, () => {
+      handle(ack, () => {
         const room = currentRoom(socket);
         const { playerId } = socket.data;
-        for (const other of [...room.sockets]) {
+        for (const other of room.sockets) {
           if (other.data.playerId === playerId) {
             room.sockets.delete(other);
             other.leave(room.id);
@@ -259,7 +260,7 @@ export function createApp({
   purgeTimer.unref();
   httpServer.on('close', () => {
     clearInterval(purgeTimer);
-    for (const room of [...rooms.values()]) closeRoom(room);
+    for (const room of rooms.values()) closeRoom(room);
   });
 
   return { app, io, httpServer, rooms };
