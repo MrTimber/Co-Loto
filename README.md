@@ -55,6 +55,7 @@ Le jeu est choisi à la création du salon :
 
 - Les joueurs jouent la grille co-créée comme ils le souhaitent : en point de vente, sur le site de la FDJ, chacun de leur côté, ou ensemble en partageant les gains.
 - La grille reste consultable **30 jours** après sa création grâce à l'**URL unique** de la partie.
+- Un joueur connecté retrouve toutes ses grilles dans **« Mes grilles »**, où il peut aussi modifier son pseudo et son adresse email, accepter de recevoir les résultats par email, et supprimer son compte. Un joueur qui a joué sans compte se voit proposer, à la fin de la partie, de se connecter : la grille qu'il vient de co-créer est alors ajoutée à son espace.
 - Si une date de tirage a été indiquée, le résultat de la grille est évalué à la publication des résultats officiels et affiché sur la page de la grille.
 - Les joueurs qui ont renseigné leur adresse email et donné leur accord peuvent **recevoir le résultat par email**.
 
@@ -70,6 +71,7 @@ Le jeu est choisi à la création du salon :
 - [x] Page de consultation de la grille (30 jours, URL unique)
 - [x] Date de tirage optionnelle (limitée aux jours de tirage du jeu)
 - [x] Installable comme une application sur smartphone et tablette (PWA)
+- [x] Connexion facultative (Google, Microsoft, GitHub, Discord, Facebook) et page « Mes grilles »
 - [ ] Vérification des résultats officiels à la date du tirage
 - [ ] Envoi des résultats par email (avec consentement)
 
@@ -91,6 +93,7 @@ Tout est gratuit et open source :
 | Temps réel | [Socket.IO](https://socket.io/) (WebSocket) |
 | Base de données | SQLite, intégré à Node.js (`node:sqlite`), aucune installation |
 | Interface | HTML, CSS et JavaScript sans framework ni étape de build, installable (PWA : manifeste et service worker) |
+| Connexion | [openid-client](https://github.com/panva/openid-client) (OAuth 2.0 et OpenID Connect, avec PKCE), sessions stockées dans SQLite |
 | Tests | Lanceur de tests intégré à Node.js (`node --test`) |
 | Intégration continue | GitHub Actions |
 | Hébergement | [Render](https://render.com/), offre gratuite (fichier `render.yaml`) |
@@ -100,7 +103,8 @@ Organisation du code :
 ```
 src/game.js       Règles du jeu (sans réseau, entièrement testées)
 src/app.js        Serveur HTTP, API et événements temps réel
-src/store.js      Stockage des grilles terminées (SQLite, 30 jours)
+src/store.js      Stockage des grilles terminées (SQLite, 30 jours), des comptes et des sessions
+src/auth.js       Connexion Google, Microsoft, GitHub, Discord, Facebook (OAuth 2.0 avec openid-client) et API « Mes grilles »
 src/drawDate.js   Validation de la date de tirage
 src/index.js      Point d'entrée
 public/           Pages web (accueil, salon, grille, page hors ligne)
@@ -127,6 +131,18 @@ Variables d'environnement facultatives :
 |---|---|---|
 | `PORT` | Port HTTP | `3000` |
 | `DATABASE_FILE` | Fichier SQLite des grilles | `data/co-loto.db` |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Connexion avec Google | _(désactivée)_ |
+| `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET` | Connexion avec Microsoft | _(désactivée)_ |
+| `MICROSOFT_TENANT` | Annuaire Microsoft autorisé | `common` (comptes personnels et professionnels) |
+| `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | Connexion avec GitHub | _(désactivée)_ |
+| `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET` | Connexion avec Discord | _(désactivée)_ |
+| `FACEBOOK_CLIENT_ID`, `FACEBOOK_CLIENT_SECRET` | Connexion avec Facebook | _(désactivée)_ |
+| `PUBLIC_URL` | Adresse publique du site, pour les URL de rappel (inutile sur Render, qui fournit `RENDER_EXTERNAL_URL`) | adresse de la requête |
+| `AUTH_DEV_LOGIN` | `1` ajoute un « compte de test » sans fournisseur, pour le développement local (toujours ignoré sur Render) | _(désactivé)_ |
+
+Un fournisseur n'apparaît que si son identifiant **et** son secret sont définis. Sans aucun, le site fonctionne sans compte, comme avant.
+
+Pour essayer la connexion en local sans créer d'application OAuth : `AUTH_DEV_LOGIN=1 npm start`.
 
 Pour tester à plusieurs sur une seule machine, ouvrez le lien du salon dans une fenêtre de navigation privée.
 
@@ -175,6 +191,53 @@ Le fichier [`render.yaml`](render.yaml) du dépôt décrit déjà toute la confi
 4. Dans **Environment Variables**, ajoutez `NODE_VERSION` avec la valeur `22` (Co-Loto a besoin de Node.js 22.13 ou plus).
 5. Cliquez sur **Deploy Web Service**, puis attendez que le journal affiche `Co-Loto est lancé`. L'adresse publique est en haut de la page du service.
 
+#### Connexion avec Google, Microsoft, GitHub, Discord et Facebook
+
+La connexion est facultative et chaque fournisseur s'active séparément. Pour chacun, il faut créer une « application OAuth » dans la console du fournisseur, y déclarer l'**URL de rappel** ci-dessous, puis copier l'identifiant et le secret dans les variables d'environnement du service Render (**Environment** > **Add Environment Variable**, puis **Save Changes** : Render redéploie le site).
+
+Remplacez `https://co-loto-xxxx.onrender.com` par l'adresse réelle du site (sans `/` final) :
+
+| Fournisseur | URL de rappel à déclarer |
+|---|---|
+| Google | `https://co-loto-xxxx.onrender.com/auth/google/callback` |
+| Microsoft | `https://co-loto-xxxx.onrender.com/auth/microsoft/callback` |
+| GitHub | `https://co-loto-xxxx.onrender.com/auth/github/callback` |
+| Discord | `https://co-loto-xxxx.onrender.com/auth/discord/callback` |
+| Facebook | `https://co-loto-xxxx.onrender.com/auth/facebook/callback` |
+
+Les aperçus de pull request ont une autre adresse : la connexion n'y fonctionne que si l'URL de rappel de l'aperçu est aussi déclarée (GitHub n'en accepte qu'une par application ; créez au besoin une seconde application de test).
+
+**Google** ([console.cloud.google.com](https://console.cloud.google.com/))
+1. Créez un projet (sélecteur de projet en haut, puis **Nouveau projet**).
+2. Menu **API et services** > **Écran de consentement OAuth** (« Google Auth Platform ») : nom de l'application `Co-Loto`, email d'assistance, audience **Externe**, puis publiez l'application (**Audience** > **Publier l'application**) pour qu'elle soit ouverte à tous. Co-Loto ne demande que l'adresse email (`openid`, `email`) : aucune validation par Google n'est nécessaire.
+3. **Clients** > **Créer un client** : type **Application Web**, ajoutez l'URL de rappel dans **URI de redirection autorisés**, puis **Créer**.
+4. Copiez l'**ID client** dans `GOOGLE_CLIENT_ID` et le **code secret** dans `GOOGLE_CLIENT_SECRET`.
+
+**Microsoft** ([entra.microsoft.com](https://entra.microsoft.com/), un compte Azure gratuit peut être demandé)
+1. **Applications** > **Inscriptions d'applications** > **Nouvelle inscription**.
+2. Nom `Co-Loto` ; types de comptes : **Comptes dans un annuaire organisationnel et comptes Microsoft personnels** ; URI de redirection : plateforme **Web** et l'URL de rappel. Cliquez sur **S'inscrire**.
+3. Copiez l'**ID d'application (client)** dans `MICROSOFT_CLIENT_ID`.
+4. **Certificats et secrets** > **Nouveau secret client** : copiez tout de suite la **Valeur** (pas l'ID) dans `MICROSOFT_CLIENT_SECRET`. Notez sa date d'expiration (24 mois au plus) : il faudra le renouveler.
+
+**GitHub** ([github.com/settings/developers](https://github.com/settings/developers))
+1. **OAuth Apps** > **New OAuth App**.
+2. Application name `Co-Loto`, Homepage URL l'adresse du site, Authorization callback URL l'URL de rappel. Cliquez sur **Register application**.
+3. Copiez le **Client ID** dans `GITHUB_CLIENT_ID`, puis **Generate a new client secret** et copiez-le dans `GITHUB_CLIENT_SECRET`.
+
+**Discord** ([discord.com/developers/applications](https://discord.com/developers/applications))
+1. **New Application**, nom `Co-Loto`.
+2. Onglet **OAuth2** : copiez le **Client ID** dans `DISCORD_CLIENT_ID`, puis **Reset Secret** et copiez le secret dans `DISCORD_CLIENT_SECRET`.
+3. Dans **Redirects**, ajoutez l'URL de rappel et enregistrez.
+
+**Facebook** ([developers.facebook.com/apps](https://developers.facebook.com/apps), avec un compte Facebook)
+1. **Créer une app**, cas d'usage **Authentifier et demander des données aux utilisateurs avec Facebook Login**, puis nom `Co-Loto` et email de contact.
+2. **Cas d'usage** > **Personnaliser** : vérifiez que l'autorisation **email** est ajoutée (en plus de `public_profile`).
+3. **Facebook Login** > **Paramètres** : dans **URI de redirection OAuth valides**, ajoutez l'URL de rappel et enregistrez.
+4. **Paramètres de l'app** > **Général** : renseignez l'URL de la politique de confidentialité (`https://co-loto-xxxx.onrender.com/confidentialite`) et, pour la suppression des données, la même page (elle explique comment supprimer son compte depuis « Mes grilles »). Copiez l'**ID de l'app** dans `FACEBOOK_CLIENT_ID` et la **clé secrète** dans `FACEBOOK_CLIENT_SECRET`.
+5. Passez l'app du mode **Développement** au mode **Live** (en haut de la page) : sans cela, seuls les administrateurs de l'app peuvent se connecter. Les autorisations `email` et `public_profile` ne demandent pas d'examen par Meta.
+
+Co-Loto demande à chaque service l'accès à l'adresse email, pour pouvoir envoyer plus tard les résultats des grilles (uniquement avec l'accord du joueur, donné dans « Mes grilles »). Données conservées : le fournisseur, l'identifiant technique qu'il donne, l'adresse email et un pseudo (celui des parties, ou le pseudo GitHub ou Discord ; jamais les vrais nom et prénom). Le joueur modifie son pseudo et son email dans « Mes grilles », et peut y supprimer son compte. Le détail est sur la page `/confidentialite` du site.
+
 #### Mises à jour
 
 Chaque fusion dans `main` redéploie automatiquement le site (« Auto-Deploy », activé par défaut). Pour redéployer à la main : **Manual Deploy** puis **Deploy latest commit** sur la page du service.
@@ -182,7 +245,7 @@ Chaque fusion dans `main` redéploie automatiquement le site (« Auto-Deploy »,
 #### Limites de l'offre gratuite
 
 - **Mise en veille :** le service s'endort après 15 minutes sans visite. La visite suivante le réveille, mais le premier chargement prend alors environ une minute. Une partie en cours n'est pas concernée, puisque les joueurs restent connectés.
-- **Disque éphémère :** les fichiers ne sont pas conservés lors d'un redéploiement, d'un redémarrage ou d'une mise en veille. La base SQLite des grilles terminées est donc effacée à ces moments-là, et les liens `/grille/...` ne fonctionnent plus. Les salons en cours sont aussi perdus lors d'un redéploiement.
+- **Disque éphémère :** les fichiers ne sont pas conservés lors d'un redéploiement, d'un redémarrage ou d'une mise en veille. La base SQLite des grilles terminées est donc effacée à ces moments-là, et les liens `/grille/...` ne fonctionnent plus. Les comptes, les sessions et la liste « Mes grilles » sont effacés en même temps : il faut se reconnecter, et les grilles déjà jouées ne peuvent plus être retrouvées. Les salons en cours sont aussi perdus lors d'un redéploiement.
 - **Quota mensuel :** l'offre gratuite donne 750 heures d'exécution par mois et par espace de travail, de quoi faire tourner un service en continu.
 
 Pour garder les grilles 30 jours de façon fiable, une prochaine étape sera de brancher une base gratuite hébergée (par exemple [Turso](https://turso.tech/), compatible SQLite).

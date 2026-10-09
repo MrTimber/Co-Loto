@@ -269,3 +269,26 @@ form label.game-option {
   font-size: .85rem;
 }
 .banner .ball { width: 1.9rem; height: 1.9rem; font-size: .9rem; }
+
+/* Compte facultatif */
+.account { display: flex; gap: 1rem; align-items: center; font-weight: 600; }
+.providers { display: grid; gap: .5rem; margin: 1rem 0; }
+.provider { text-align: center; font-weight: 600; }
+.account-offer { margin-top: 1rem; }
+#view-finished .account-offer { border-top: 1px solid var(--border); padding-top: 1rem; }
+.account-offer h2 { margin-bottom: .25rem; }
+.my-grids { list-style: none; padding: 0; margin: 0 0 1.5rem; }
+.my-grid { padding: 1rem 0; border-bottom: 1px solid var(--border); }
+.my-grid .summary { margin: .5rem 0; }
+.my-grid-title { margin: 0; font-weight: 600; }
+.my-grid .ball { width: 2rem; height: 2rem; font-size: .9rem; }
+.prose ul { padding-left: 1.25rem; }
+.prose li { margin-bottom: .5rem; }
+.my-grid button.link { padding-left: 0; }
+.account-offer > :first-child { margin-top: 0; }
+.account-offer > :last-child { margin-bottom: 0; }
+.profile { border-top: 1px solid var(--border); padding-top: 1rem; margin-bottom: 1rem; }
+.profile label.inline { display: flex; gap: .5rem; align-items: flex-start; }
+.profile input[type=checkbox] { width: auto; margin-top: .3rem; flex: none; }
+.danger-zone { margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--border); text-align: center; }
+button.link.danger { color: var(--danger); }
