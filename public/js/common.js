@@ -47,8 +47,3 @@ export function describeGame(rules) {
 export function gridBalls(numbers, bonus) {
   return numbers.map((n) => ball(n, 'validated')).join('') + bonus.map((n) => ball(n, 'bonus')).join('');
 }
-
-// Service worker : permet d'installer Co-Loto comme une application sur mobile et tablette.
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/sw.js').catch((err) => console.warn('Service worker non enregistré :', err));
-}
