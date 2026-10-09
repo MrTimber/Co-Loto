@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { io as connect } from 'socket.io-client';
 import { createApp } from '../src/app.js';
 import { openStore, GRID_LIFETIME_MS } from '../src/store.js';
-import { enabledProviders, safeReturnPath, parseCookies } from '../src/auth.js';
+import { enabledProviders, parseCookies } from '../src/auth.js';
 
 test('comptes, sessions et grilles rattachées dans le stockage', () => {
   const store = openStore();
@@ -54,11 +54,7 @@ test('fournisseurs activés selon les variables d’environnement', () => {
   assert.deepEqual(enabledProviders({ AUTH_DEV_LOGIN: '1', RENDER: 'true' }), []);
 });
 
-test('adresse de retour limitée au site, lecture des cookies', () => {
-  assert.equal(safeReturnPath('/grille/abc?x=1'), '/grille/abc?x=1');
-  for (const bad of ['//evil.example', '/\\evil.example', 'https://evil.example', 'grille', undefined, `/${'a'.repeat(300)}`]) {
-    assert.equal(safeReturnPath(bad), '/mes-grilles');
-  }
+test('lecture des cookies', () => {
   assert.deepEqual(parseCookies('a=1; b=%C3%A9; c=%E0; bad'), { a: '1', b: 'é' });
 });
 
@@ -185,4 +181,21 @@ test('connexion GitHub : redirection, contrôle de l’état et création du com
   assert.deepEqual(account.user, { name: 'octocat', provider: 'github' });
 
   assert.equal((await request('/auth/google')).status, 404); // fournisseur non configuré
+});
+
+test('après connexion, retour uniquement vers une page connue du site', async () => {
+  const { roomId } = await (await request('/api/rooms', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: 'Alice' }) })).json();
+  const cases = {
+    '/': '/',
+    [`/salon/${roomId}`]: `/salon/${roomId}`,
+    '/salon/inconnu': '/mes-grilles',
+    '/grille/inconnue': '/mes-grilles',
+    '//evil.example': '/mes-grilles',
+    '/\\evil.example': '/mes-grilles',
+    'https://evil.example': '/mes-grilles',
+  };
+  for (const [retour, expected] of Object.entries(cases)) {
+    const res = await request(`/auth/dev?retour=${encodeURIComponent(retour)}`);
+    assert.equal(res.headers.get('location'), expected, retour);
+  }
 });

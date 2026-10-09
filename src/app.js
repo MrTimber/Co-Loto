@@ -66,7 +66,7 @@ export function createApp({
   // Derrière le proxy HTTPS de l'hébergeur : nécessaire pour les cookies « Secure ».
   app.set('trust proxy', 1);
   app.use(express.json({ limit: '4kb' }));
-  app.use(createAuth({ store, env }).router);
+  app.use(createAuth({ store, env, findRoomId: (id) => rooms.get(id)?.id }).router);
   // Les règles des jeux sont partagées avec le navigateur.
   app.get('/js/games.js', (req, res) => res.sendFile(GAMES_MODULE));
   app.use(express.static(PUBLIC_DIR, { extensions: ['html'] }));

@@ -89,21 +89,32 @@ export function parseCookies(header = '') {
   return cookies;
 }
 
-// Adresse de retour après connexion : uniquement un chemin de ce site.
-export function safeReturnPath(value) {
-  const fallback = '/mes-grilles';
-  if (typeof value !== 'string' || value.length > 200 || !value.startsWith('/')) return fallback;
-  if (value.startsWith('//') || value.includes('\\') || /\s/.test(value)) return fallback;
-  return value;
-}
-
 function cleanName(name) {
   const text = String(name ?? '').replaceAll(/\s+/g, ' ').trim().slice(0, NAME_MAX_LENGTH);
   return text || 'Joueur';
 }
 
-export function createAuth({ store, env = process.env, fetchImpl = (...args) => globalThis.fetch(...args) }) {
+const DEFAULT_RETURN = '/mes-grilles';
+const STATIC_RETURNS = new Map(['/', '/mes-grilles', '/confidentialite'].map((path) => [path, path]));
+
+// `findRoomId` : identifiant d'un salon ouvert, ou undefined.
+export function createAuth({ store, env = process.env, findRoomId = () => undefined, fetchImpl = (...args) => globalThis.fetch(...args) }) {
   const providers = enabledProviders(env);
+
+  // Adresse de retour après connexion : une page connue de ce site, reconstruite à partir
+  // de nos propres données (jamais l'adresse reçue telle quelle).
+  function returnPath(value) {
+    if (typeof value !== 'string') return DEFAULT_RETURN;
+    const known = STATIC_RETURNS.get(value);
+    if (known) return known;
+    const grid = /^\/grille\/([\w-]{1,40})$/.exec(value);
+    const gridId = grid && store.getGrid(grid[1])?.id;
+    if (gridId) return `/grille/${gridId}`;
+    const room = /^\/salon\/([\w-]{1,40})$/.exec(value);
+    const roomId = room && findRoomId(room[1]);
+    if (roomId) return `/salon/${roomId}`;
+    return DEFAULT_RETURN;
+  }
   const router = express.Router();
 
   const cookieOptions = (req, maxAge, path = '/') => ({ httpOnly: true, sameSite: 'lax', secure: req.secure, maxAge, path });
@@ -111,7 +122,9 @@ export function createAuth({ store, env = process.env, fetchImpl = (...args) => 
   // Adresse publique du site, pour l'URL de rappel déclarée chez chaque fournisseur.
   function baseUrl(req) {
     const configured = env.PUBLIC_URL || env.RENDER_EXTERNAL_URL;
-    return (configured || `${req.protocol}://${req.get('host')}`).replace(/\/+$/, '');
+    let url = configured || `${req.protocol}://${req.get('host')}`;
+    while (url.endsWith('/')) url = url.slice(0, -1);
+    return url;
   }
 
   function oauthClient(req, providerId) {
@@ -139,7 +152,7 @@ export function createAuth({ store, env = process.env, fetchImpl = (...args) => 
   router.get('/auth/dev', (req, res, next) => {
     if (!providers.includes('dev')) return next();
     logIn(req, res, { provider: 'dev', providerId: cleanName(req.query.nom ?? 'Testeur'), name: req.query.nom ?? 'Testeur' });
-    res.redirect(safeReturnPath(req.query.retour));
+    res.redirect(returnPath(req.query.retour));
   });
 
   router.get('/auth/:provider', (req, res, next) => {
@@ -150,7 +163,7 @@ export function createAuth({ store, env = process.env, fetchImpl = (...args) => 
     const verifier = pkce ? generateCodeVerifier() : null;
     const client = oauthClient(req, providerId);
     const url = pkce ? client.createAuthorizationURL(state, verifier, scopes) : client.createAuthorizationURL(state, scopes);
-    const pending = { provider: providerId, state, verifier, retour: safeReturnPath(req.query.retour) };
+    const pending = { provider: providerId, state, verifier, retour: returnPath(req.query.retour) };
     res.cookie(OAUTH_COOKIE, Buffer.from(JSON.stringify(pending)).toString('base64url'), cookieOptions(req, OAUTH_MAX_AGE_MS, '/auth'));
     res.redirect(url.toString());
   });
@@ -165,7 +178,7 @@ export function createAuth({ store, env = process.env, fetchImpl = (...args) => 
       // cookie absent ou illisible : traité comme une tentative invalide
     }
     res.clearCookie(OAUTH_COOKIE, { path: '/auth' });
-    const retour = safeReturnPath(pending?.retour);
+    const retour = returnPath(pending?.retour);
     const failed = () => res.redirect(`/connexion?erreur=1&retour=${encodeURIComponent(retour)}`);
     if (pending?.provider !== providerId || typeof req.query.state !== 'string' || req.query.state !== pending.state || typeof req.query.code !== 'string') {
       return failed();
