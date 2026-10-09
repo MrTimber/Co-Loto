@@ -34,7 +34,7 @@ function selectGame() {
   const rules = rulesFor(form.elements.gameType.value);
   applyTheme(rules.id);
   document.getElementById('game-summary').textContent = `${describeGame(rules)[0].toUpperCase()}${describeGame(rules).slice(1)}`;
-  document.getElementById('draw-days').textContent = `(optionnel : ${rules.theName} est tiré ${rules.drawDays})`;
+  document.getElementById('draw-days').textContent = `${rules.theName} est tiré ${rules.drawDays}.`;
   fillDrawDates(rules);
 }
 form.elements.gameType.forEach((radio) => radio.addEventListener('change', selectGame));
