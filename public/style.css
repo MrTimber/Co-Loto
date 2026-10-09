@@ -1,0 +1,163 @@
+:root {
+  --bg: #f5f7fb;
+  --surface: #ffffff;
+  --text: #1d2433;
+  --muted: #667085;
+  --border: #dde3ee;
+  --accent: #0f766e;
+  --accent-soft: #ccfbf1;
+  --pending: #f59e0b;
+  --pending-soft: #fef3c7;
+  --chance: #e11d48;
+  --chance-soft: #ffe4e6;
+  --picked: #e5e9f2;
+  --danger: #b42318;
+  --radius: 12px;
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f1420;
+    --surface: #182030;
+    --text: #e6eaf2;
+    --muted: #98a2b3;
+    --border: #2b3547;
+    --accent: #2dd4bf;
+    --accent-soft: #134e4a;
+    --pending: #fbbf24;
+    --pending-soft: #4a3a10;
+    --chance: #fb7185;
+    --chance-soft: #4c1d2a;
+    --picked: #263045;
+    --danger: #f97066;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+a { color: var(--accent); }
+h1 { font-size: 1.6rem; margin: 0 0 .75rem; }
+h2 { font-size: 1.15rem; margin: 0 0 .75rem; }
+[hidden] { display: none !important; }
+
+.site-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: .75rem 1rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+.logo { font-weight: 800; font-size: 1.3rem; text-decoration: none; color: var(--accent); }
+.site-footer { margin-top: auto; padding: 1.5rem 1rem; text-align: center; font-size: .85rem; color: var(--muted); }
+
+.container { width: 100%; max-width: 1100px; margin: 0 auto; padding: 1.5rem 1rem; }
+.intro { max-width: 680px; margin-bottom: 1.5rem; }
+.columns, .grids { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem; }
+.narrow { max-width: 560px; margin: 0 auto; }
+.center { text-align: center; }
+.muted { color: var(--muted); }
+.small { font-size: .875rem; }
+.error { color: var(--danger); min-height: 1.5em; margin: .5rem 0; }
+
+form label, .invite label { display: block; margin-bottom: 1rem; font-weight: 600; }
+form label.inline { font-weight: 400; margin-bottom: .25rem; }
+fieldset { border: 0; padding: 0; margin: 0 0 1rem; }
+legend { font-weight: 600; margin-bottom: .25rem; padding: 0; }
+input:not([type=radio]), select {
+  display: block;
+  width: 100%;
+  margin-top: .3rem;
+  padding: .6rem .75rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+}
+
+button, .button {
+  display: inline-block;
+  padding: .6rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+button.link { border: 0; background: none; color: var(--muted); text-decoration: underline; }
+button:disabled { opacity: .5; cursor: not-allowed; }
+.actions, .invite-actions { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
+.invite { margin-bottom: 1.25rem; }
+
+.lobbies, .players { list-style: none; padding: 0; margin: 0 0 1rem; }
+.lobbies a { display: flex; justify-content: space-between; gap: 1rem; padding: .75rem; border: 1px solid var(--border); border-radius: 8px; margin-bottom: .5rem; text-decoration: none; color: var(--text); }
+.lobbies a span { color: var(--muted); }
+.players li { padding: .4rem 0; border-bottom: 1px solid var(--border); }
+.players.compact { display: flex; flex-wrap: wrap; gap: .5rem 1rem; margin: .5rem 0 0; }
+.players.compact li { border: 0; padding: 0; }
+.tag { font-size: .75rem; padding: .05rem .45rem; border-radius: 99px; background: var(--picked); color: var(--muted); }
+.tag.warn { background: var(--pending-soft); color: var(--text); }
+.pick-status { font-size: .85rem; color: var(--muted); }
+.pick-status.done { color: var(--accent); font-weight: 600; }
+
+.game-status { margin-bottom: 1rem; }
+.banner { background: var(--accent-soft); border-radius: var(--radius); padding: .75rem 1rem; margin: 0 0 1rem; }
+
+.grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: .35rem; }
+.grid.chance { grid-template-columns: repeat(5, 1fr); }
+#collective-chance { grid-template-columns: repeat(10, 1fr); gap: .25rem; }
+.grid-label { margin: 1rem 0 .4rem; font-size: .875rem; font-weight: 600; color: var(--muted); }
+.cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 600;
+  font-size: .95rem;
+}
+button.cell:hover:not(:disabled) { border-color: var(--accent); }
+.cell.picked { background: var(--picked); color: var(--muted); opacity: 1; cursor: default; text-decoration: line-through; }
+.cell.pending { background: var(--pending-soft); border: 2px solid var(--pending); }
+.cell.validated { background: var(--accent); border-color: var(--accent); color: #fff; text-decoration: none; }
+.cell.chance-validated { background: var(--chance); border-color: var(--chance); color: #fff; }
+#personal-grid.chance .cell.validated { background: var(--chance); border-color: var(--chance); }
+
+.summary { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: 1rem; }
+.summary.big { justify-content: center; margin: 1rem 0 1.5rem; }
+.ball {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.4rem;
+  height: 2.4rem;
+  border-radius: 50%;
+  font-weight: 700;
+  background: var(--accent);
+  color: #fff;
+}
+.summary.big .ball { width: 3.2rem; height: 3.2rem; font-size: 1.3rem; }
+.ball.chance { background: var(--chance); }
+.ball.empty { background: transparent; border: 2px dashed var(--border); color: var(--muted); }
+.ball.chance-empty { border-color: var(--chance-soft); }
+.banner .ball { width: 1.9rem; height: 1.9rem; font-size: .9rem; }

@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Co-Loto · Salon</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="site-header">
+    <a class="logo" href="/">Co-Loto</a>
+    <span id="connection" class="connection muted"></span>
+  </header>
+
+  <main class="container">
+    <section id="view-message" class="card narrow">
+      <p id="message-text" class="muted">Connexion au salon…</p>
+      <p><a href="/" id="message-link" hidden>Retour à l'accueil</a></p>
+    </section>
+
+    <section id="view-join" class="card narrow" hidden>
+      <h1>Rejoindre le salon</h1>
+      <form id="join-form">
+        <label>Votre pseudo
+          <input name="name" required maxlength="24" autocomplete="nickname">
+        </label>
+        <p class="error" id="join-error" role="alert"></p>
+        <button type="submit" class="primary">Rejoindre</button>
+      </form>
+    </section>
+
+    <section id="view-lobby" class="card narrow" hidden>
+      <h1>Salle d'attente</h1>
+      <p id="lobby-info" class="muted"></p>
+      <div class="invite">
+        <label>Lien d'invitation
+          <input id="invite-link" readonly>
+        </label>
+        <div class="invite-actions">
+          <button type="button" id="copy-link">Copier le lien</button>
+          <a id="mail-link" class="button">Inviter par email</a>
+          <button type="button" id="share-link" hidden>Partager…</button>
+        </div>
+      </div>
+      <h2>Joueurs</h2>
+      <ul id="lobby-players" class="players"></ul>
+      <p id="lobby-hint" class="muted"></p>
+      <p class="error" id="lobby-error" role="alert"></p>
+      <div class="actions">
+        <button type="button" id="start-game" class="primary" hidden>Lancer la partie</button>
+        <button type="button" id="leave-lobby" class="link">Quitter le salon</button>
+      </div>
+    </section>
+
+    <section id="view-game" hidden>
+      <div class="game-status card">
+        <div>
+          <strong id="round-label"></strong>
+          <span id="round-hint" class="muted"></span>
+        </div>
+        <ul id="game-players" class="players compact"></ul>
+      </div>
+      <p id="last-round" class="banner" hidden></p>
+      <p class="error" id="game-error" role="alert"></p>
+      <div class="grids">
+        <section class="card">
+          <h2>Ma grille</h2>
+          <p class="muted small" id="personal-hint"></p>
+          <div id="personal-grid" class="grid"></div>
+        </section>
+        <section class="card">
+          <h2>Grille collective</h2>
+          <div id="collective-summary" class="summary"></div>
+          <div id="collective-grid" class="grid"></div>
+          <p class="grid-label">Numéro chance</p>
+          <div id="collective-chance" class="grid chance"></div>
+        </section>
+      </div>
+    </section>
+
+    <section id="view-finished" class="card narrow" hidden>
+      <h1>Votre grille est prête ! 🎉</h1>
+      <div id="final-grid" class="summary big"></div>
+      <p>Retrouvez-la pendant 30 jours à cette adresse :</p>
+      <p><a id="grid-link"></a></p>
+      <p class="muted small">Jouez-la comme vous le souhaitez : en point de vente, sur le site de la FDJ, chacun de votre côté ou ensemble.</p>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    Co-Loto est un site gratuit, sans aucune affiliation avec la Française des Jeux (<a href="https://www.fdj.fr/" rel="noopener">fdj.fr</a>).
+  </footer>
+  <script src="/socket.io/socket.io.js"></script>
+  <script type="module" src="/js/salon.js"></script>
+</body>
+</html>
