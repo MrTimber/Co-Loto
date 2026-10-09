@@ -7,7 +7,6 @@ const PRECACHE = [
   OFFLINE_PAGE,
   '/style.css',
   '/favicon.ico',
-  '/icons/favicon-32x32.png',
   '/icons/icon-192.png',
   '/img/logo.png',
 ];
