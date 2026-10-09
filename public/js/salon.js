@@ -121,6 +121,8 @@ $('leave-lobby').addEventListener('click', () => {
 function render() {
   if (!state?.me) return;
   applyTheme(state.gameType);
+  $('header-badge').textContent = rulesFor(state.gameType).name;
+  $('header-badge').hidden = false;
   if (state.status === 'lobby') renderLobby();
   else if (state.status === 'playing') renderGame();
   else if (state.status === 'finished') renderFinished();

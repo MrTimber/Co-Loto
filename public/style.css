@@ -76,6 +76,8 @@ h2 { font-size: 1.15rem; margin: 0 0 .75rem; }
   background: var(--surface);
 }
 .logo { font-weight: 800; font-size: 1.3rem; text-decoration: none; color: var(--accent); }
+.brand { display: flex; align-items: center; gap: .6rem; }
+.brand .game-badge { margin: 0; }
 .site-footer { margin-top: auto; padding: 1.5rem 1rem; text-align: center; font-size: .85rem; color: var(--on-theme); opacity: .85; }
 .site-footer a { color: inherit; }
 
