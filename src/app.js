@@ -18,6 +18,7 @@ import {
   viewFor,
 } from './game.js';
 import { validateDrawDate } from './drawDate.js';
+import { createAuth } from './auth.js';
 
 const PUBLIC_DIR = fileURLToPath(new URL('../public/', import.meta.url));
 const GAMES_MODULE = fileURLToPath(new URL('./games.js', import.meta.url));
@@ -56,12 +57,16 @@ export function createApp({
   finishedRoomTtlMs = 10 * 60_000,
   maxRooms = 1000,
   rng = Math.random,
+  env = process.env,
 } = {}) {
   const rooms = new Map();
 
   const app = express();
   app.disable('x-powered-by');
+  // Derrière le proxy HTTPS de l'hébergeur : nécessaire pour les cookies « Secure ».
+  app.set('trust proxy', 1);
   app.use(express.json({ limit: '4kb' }));
+  app.use(createAuth({ store, env }).router);
   // Les règles des jeux sont partagées avec le navigateur.
   app.get('/js/games.js', (req, res) => res.sendFile(GAMES_MODULE));
   app.use(express.static(PUBLIC_DIR, { extensions: ['html'] }));
@@ -81,6 +86,7 @@ export function createApp({
         players: game.players.length,
         maxPlayers: game.maxPlayers,
         drawDate: game.drawDate,
+        participants: [...room.tokens].map(([token, playerId]) => ({ token, name: findPlayer(game, playerId)?.name })).filter((p) => p.name),
       });
     }
     res.json(lobbies);
@@ -156,6 +162,7 @@ export function createApp({
         players: game.players.map((p) => p.name),
         rounds: game.rounds.length,
         drawDate: game.drawDate,
+        participants: [...room.tokens].map(([token, playerId]) => ({ token, name: findPlayer(game, playerId)?.name })).filter((p) => p.name),
       });
       for (const timer of room.offlineTimers.values()) clearTimeout(timer);
       room.offlineTimers.clear();

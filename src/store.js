@@ -1,9 +1,28 @@
 // Stockage des grilles terminées dans SQLite (module intégré à Node.js).
 import { DatabaseSync } from 'node:sqlite';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 
 export const GRID_LIFETIME_MS = 30 * 24 * 60 * 60 * 1000;
+export const SESSION_LIFETIME_MS = 30 * 24 * 60 * 60 * 1000;
+
+// Les jetons (session, participation) ne sont jamais stockés en clair.
+const hash = (token) => createHash('sha256').update(String(token)).digest('base64url');
+
+function toGrid(row) {
+  return {
+    id: row.id,
+    createdAt: new Date(row.created_at).toISOString(),
+    expiresAt: new Date(row.expires_at).toISOString(),
+    drawDate: row.draw_date,
+    gameType: row.game_type,
+    numbers: JSON.parse(row.numbers),
+    bonus: row.bonus ? JSON.parse(row.bonus) : [row.chance],
+    players: JSON.parse(row.players),
+    rounds: row.rounds,
+  };
+}
 
 export function openStore(file = ':memory:') {
   if (file !== ':memory:') mkdirSync(dirname(file), { recursive: true });
@@ -24,16 +43,65 @@ export function openStore(file = ':memory:') {
   const columns = new Set(db.prepare('PRAGMA table_info(grids)').all().map((c) => c.name));
   if (!columns.has('game_type')) db.exec("ALTER TABLE grids ADD COLUMN game_type TEXT NOT NULL DEFAULT 'loto'");
   if (!columns.has('bonus')) db.exec('ALTER TABLE grids ADD COLUMN bonus TEXT');
+  // Comptes : uniquement l'identifiant chez le fournisseur et le nom affiché.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY,
+      provider TEXT NOT NULL,
+      provider_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      UNIQUE (provider, provider_id)
+    );
+    CREATE TABLE IF NOT EXISTS sessions (
+      token_hash TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      expires_at INTEGER NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS grid_players (
+      token_hash TEXT PRIMARY KEY,
+      grid_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      user_id TEXT
+    );
+    CREATE INDEX IF NOT EXISTS grid_players_user ON grid_players (user_id);
+  `);
   const insert = db.prepare(`
     INSERT OR REPLACE INTO grids (id, created_at, expires_at, draw_date, game_type, numbers, bonus, chance, players, rounds)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   const select = db.prepare('SELECT * FROM grids WHERE id = ? AND expires_at > ?');
   const purge = db.prepare('DELETE FROM grids WHERE expires_at <= ?');
+  const insertPlayer = db.prepare('INSERT OR IGNORE INTO grid_players (token_hash, grid_id, name) VALUES (?, ?, ?)');
+  const selectUser = db.prepare('SELECT id, provider, name FROM users WHERE provider = ? AND provider_id = ?');
+  const insertUser = db.prepare('INSERT INTO users (id, provider, provider_id, name, created_at) VALUES (?, ?, ?, ?, ?)');
+  const renameUser = db.prepare('UPDATE users SET name = ? WHERE id = ?');
+  const insertSession = db.prepare('INSERT INTO sessions (token_hash, user_id, expires_at) VALUES (?, ?, ?)');
+  const selectSession = db.prepare(`
+    SELECT users.id, users.provider, users.name FROM sessions JOIN users ON users.id = sessions.user_id
+    WHERE sessions.token_hash = ? AND sessions.expires_at > ?
+  `);
+  const deleteSessionStmt = db.prepare('DELETE FROM sessions WHERE token_hash = ?');
+  const claim = db.prepare(`
+    UPDATE grid_players SET user_id = ?
+    WHERE token_hash = ? AND grid_id = ? AND (user_id IS NULL OR user_id = ?)
+      AND EXISTS (SELECT 1 FROM grids WHERE grids.id = grid_players.grid_id AND grids.expires_at > ?)
+  `);
+  const selectUserGrids = db.prepare(`
+    SELECT grids.*, grid_players.name AS player_name FROM grid_players JOIN grids ON grids.id = grid_players.grid_id
+    WHERE grid_players.user_id = ? AND grids.expires_at > ? ORDER BY grids.created_at DESC
+  `);
+  const unclaim = db.prepare('UPDATE grid_players SET user_id = NULL WHERE user_id = ? AND grid_id = ?');
+  const unclaimAll = db.prepare('UPDATE grid_players SET user_id = NULL WHERE user_id = ?');
+  const deleteUserSessions = db.prepare('DELETE FROM sessions WHERE user_id = ?');
+  const deleteUserStmt = db.prepare('DELETE FROM users WHERE id = ?');
+  const purgePlayers = db.prepare('DELETE FROM grid_players WHERE grid_id NOT IN (SELECT id FROM grids)');
+  const purgeSessions = db.prepare('DELETE FROM sessions WHERE expires_at <= ?');
 
   return {
     // `bonus` : numéros complémentaires (numéro chance, étoiles ou numéro Dream).
-    saveGrid({ id, gameType = 'loto', numbers, bonus, players, rounds, drawDate = null }, now = Date.now()) {
+    // `participants` : jeton et pseudo de chaque joueur, pour rattacher plus tard la grille à son compte.
+    saveGrid({ id, gameType = 'loto', numbers, bonus, players, rounds, drawDate = null, participants = [] }, now = Date.now()) {
       insert.run(
         id,
         now,
@@ -46,24 +114,57 @@ export function openStore(file = ':memory:') {
         JSON.stringify(players),
         rounds,
       );
+      for (const { token, name } of participants) insertPlayer.run(hash(token), id, name);
     },
     getGrid(id, now = Date.now()) {
       const row = select.get(id, now);
-      if (!row) return null;
-      return {
-        id: row.id,
-        createdAt: new Date(row.created_at).toISOString(),
-        expiresAt: new Date(row.expires_at).toISOString(),
-        drawDate: row.draw_date,
-        gameType: row.game_type,
-        numbers: JSON.parse(row.numbers),
-        bonus: row.bonus ? JSON.parse(row.bonus) : [row.chance],
-        players: JSON.parse(row.players),
-        rounds: row.rounds,
-      };
+      return row ? toGrid(row) : null;
+    },
+    // Retrouve le compte lié à un fournisseur, ou le crée. Le nom suit celui du fournisseur.
+    upsertUser({ provider, providerId, name }, now = Date.now()) {
+      const existing = selectUser.get(provider, providerId);
+      if (existing) {
+        if (existing.name !== name) renameUser.run(name, existing.id);
+        return { ...existing, name };
+      }
+      const id = randomUUID();
+      insertUser.run(id, provider, providerId, name, now);
+      return { id, provider, name };
+    },
+    createSession(userId, now = Date.now()) {
+      const token = randomBytes(32).toString('base64url');
+      insertSession.run(hash(token), userId, now + SESSION_LIFETIME_MS);
+      return token;
+    },
+    getSessionUser(token, now = Date.now()) {
+      if (!token) return null;
+      const row = selectSession.get(hash(token), now);
+      return row ? { id: row.id, provider: row.provider, name: row.name } : null;
+    },
+    deleteSession(token) {
+      if (token) deleteSessionStmt.run(hash(token));
+    },
+    // Rattache une grille au compte grâce au jeton de participation gardé par le navigateur.
+    claimGrid(userId, gridId, playerToken, now = Date.now()) {
+      if (typeof playerToken !== 'string' || typeof gridId !== 'string') return false;
+      return Number(claim.run(userId, hash(playerToken), gridId, userId, now).changes) > 0;
+    },
+    listUserGrids(userId, now = Date.now()) {
+      return selectUserGrids.all(userId, now).map((row) => ({ ...toGrid(row), playerName: row.player_name }));
+    },
+    forgetUserGrid(userId, gridId) {
+      return Number(unclaim.run(userId, gridId).changes) > 0;
+    },
+    deleteUser(userId) {
+      unclaimAll.run(userId);
+      deleteUserSessions.run(userId);
+      deleteUserStmt.run(userId);
     },
     purgeExpired(now = Date.now()) {
-      return Number(purge.run(now).changes);
+      const removed = Number(purge.run(now).changes);
+      purgePlayers.run();
+      purgeSessions.run(now);
+      return removed;
     },
     close() {
       db.close();

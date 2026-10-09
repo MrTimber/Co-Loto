@@ -1,4 +1,5 @@
 import { saveToken, loadToken, forgetToken, escapeHtml, formatDrawDate, ball, rulesFor, applyTheme, countLabel, gridBalls } from './common.js';
+import { renderGridAccountOffer } from './account.js';
 
 const roomId = decodeURIComponent(location.pathname.split('/').pop());
 const socket = io({ transports: ['websocket', 'polling'] });
@@ -276,6 +277,8 @@ function collectiveHint(phase, isBonus, validated) {
   return `${subject} ${phase.one} validé${e(phase)} par tout le monde terminera la grille.`;
 }
 
+let offerShown = false;
+
 function renderFinished() {
   show('finished');
   const rules = rulesFor(state.gameType);
@@ -286,6 +289,10 @@ function renderFinished() {
   const url = `${location.origin}/grille/${encodeURIComponent(roomId)}`;
   $('grid-link').href = url;
   $('grid-link').textContent = url;
+  if (!offerShown) {
+    offerShown = true;
+    renderGridAccountOffer($('account-offer'), roomId);
+  }
 }
 
 const gridUrl = () => $('grid-link').href;

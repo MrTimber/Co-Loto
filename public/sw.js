@@ -45,7 +45,7 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
   if (request.method !== 'GET' || url.origin !== self.location.origin) return;
-  if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/socket.io/')) return;
+  if (['/api/', '/auth/', '/socket.io/'].some((prefix) => url.pathname.startsWith(prefix))) return;
 
   if (request.mode === 'navigate') {
     event.respondWith(networkFirst(request, OFFLINE_PAGE));
