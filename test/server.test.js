@@ -171,4 +171,5 @@ test("l'application est installable : manifeste, icônes et service worker", asy
   assert.match(sw.headers.get('content-type'), /javascript/);
   assert.equal((await fetch(`${baseUrl}/hors-ligne.html`)).status, 200);
   assert.equal((await fetch(`${baseUrl}/icons/apple-touch-icon.png`)).status, 200);
+  assert.equal((await fetch(`${baseUrl}/favicon.ico`)).status, 200);
 });
