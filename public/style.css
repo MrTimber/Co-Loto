@@ -138,23 +138,27 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 
 .grid { display: grid; grid-template-columns: repeat(var(--columns, 7), 1fr); gap: .35rem; }
 .cell {
+  --cell-bg: var(--surface);
+  --cell-line: var(--border);
+  --cell-line-width: 1px;
+  --cell-text: var(--text);
   display: flex;
   align-items: center;
   justify-content: center;
   aspect-ratio: 1;
   padding: 0;
-  border: 1px solid var(--border);
+  border: var(--cell-line-width) solid var(--cell-line);
   border-radius: 50%;
-  background: var(--surface);
-  color: var(--text);
+  background: var(--cell-bg);
+  color: var(--cell-text);
   font-weight: 600;
   font-size: .95rem;
 }
-button.cell:hover:not(:disabled) { border-color: var(--accent); }
-.cell.picked { background: var(--picked); color: var(--muted); opacity: 1; cursor: default; text-decoration: line-through; }
-.cell.pending { background: var(--pending-soft); border: 2px solid var(--pending); }
-.cell.validated { background: var(--accent); border-color: var(--accent); color: var(--accent-text); text-decoration: none; }
-.cell.bonus-validated, #personal-grid.bonus .cell.validated { background: var(--bonus); border-color: var(--bonus); color: var(--bonus-text); }
+button.cell:hover:not(:disabled) { --cell-line: var(--accent); }
+.cell.picked { --cell-bg: var(--picked); --cell-text: var(--muted); opacity: 1; cursor: default; text-decoration: line-through; }
+.cell.pending { --cell-bg: var(--pending-soft); --cell-line: var(--pending); --cell-line-width: 2px; }
+.cell.validated { --cell-bg: var(--accent); --cell-line: var(--accent); --cell-text: var(--accent-text); text-decoration: none; }
+.cell.bonus-validated, #personal-grid.bonus .cell.validated { --cell-bg: var(--bonus); --cell-line: var(--bonus); --cell-text: var(--bonus-text); }
 
 .summary { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: 1rem; }
 .summary.big { justify-content: center; margin: 1rem 0 1.5rem; }
@@ -171,6 +175,44 @@ button.cell:hover:not(:disabled) { border-color: var(--accent); }
 }
 .summary.big .ball { width: 3.2rem; height: 3.2rem; font-size: 1.3rem; }
 .ball.bonus { background: var(--bonus); color: var(--bonus-text); }
+
+/* Numéros complémentaires : étoiles pour l'Euromillions, gouttes pour EuroDreams (le Loto garde des ronds).
+   La forme est dessinée par des pseudo-éléments placés sous le numéro, qui reprennent les couleurs de l'état de la case. */
+.ball.bonus { --cell-bg: var(--bonus); --cell-line: var(--bonus); --cell-line-width: 0px; }
+:is([data-game=euromillions], [data-game=eurodreams]) :is(.grid.bonus .cell, .ball.bonus) {
+  position: relative;
+  isolation: isolate;
+  border-color: transparent;
+  border-radius: 0;
+  background: none;
+}
+:is([data-game=euromillions], [data-game=eurodreams]) :is(.grid.bonus .cell, .ball.bonus)::before,
+[data-game=euromillions] :is(.grid.bonus .cell, .ball.bonus)::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+}
+[data-game=euromillions] :is(.grid.bonus .cell, .ball.bonus) { padding-top: .12em; }
+[data-game=euromillions] :is(.grid.bonus .cell, .ball.bonus)::before,
+[data-game=euromillions] :is(.grid.bonus .cell, .ball.bonus)::after {
+  clip-path: polygon(50% 4.8%, 65% 34.1%, 97.6% 39.3%, 74.3% 62.7%, 79.4% 95.2%, 50% 80.3%, 20.6% 95.2%, 25.7% 62.7%, 2.4% 39.3%, 35% 34.1%);
+}
+[data-game=euromillions] :is(.grid.bonus .cell, .ball.bonus)::before { inset: -2px; background: var(--cell-line); }
+[data-game=euromillions] :is(.grid.bonus .cell, .ball.bonus)::after { inset: calc(var(--cell-line-width) * 2 - 2px); background: var(--cell-bg); }
+[data-game=eurodreams] :is(.grid.bonus .cell, .ball.bonus)::before {
+  inset: 10%;
+  border: var(--cell-line-width) solid var(--cell-line);
+  border-radius: 50% 50% 0;
+  background: var(--cell-bg);
+  box-shadow: 1px 1px 3px rgb(0 0 0 / .18);
+  transform: translateY(-10%) rotate(45deg);
+}
+[data-game=eurodreams] .grid.bonus .cell:not(.picked) { --cell-text: var(--bonus); }
+[data-game=eurodreams] .grid.bonus .cell:is(.validated, .bonus-validated) { --cell-text: var(--bonus-text); }
+@media (prefers-color-scheme: dark) {
+  [data-game=eurodreams] .grid.bonus .cell:not(.picked) { --cell-text: #f472b6; }
+  [data-game=eurodreams] .grid.bonus .cell:is(.validated, .bonus-validated) { --cell-text: var(--bonus-text); }
+}
 
 .game-picker { display: grid; grid-template-columns: repeat(3, 1fr); gap: .5rem; }
 .game-picker legend { grid-column: 1 / -1; }
