@@ -19,3 +19,12 @@ test('la date de tirage doit être un lundi, mercredi ou samedi à venir', () =>
   assert.throws(() => validateDrawDate('2026-02-30', now), /valide/);
   assert.throws(() => validateDrawDate('10/10/2026', now), /format/);
 });
+
+test('les jours de tirage dépendent du jeu', () => {
+  assert.equal(validateDrawDate('2026-10-13', now, 'euromillions'), '2026-10-13'); // mardi
+  assert.equal(validateDrawDate('2026-10-16', now, 'euromillions'), '2026-10-16'); // vendredi
+  assert.throws(() => validateDrawDate('2026-10-10', now, 'euromillions'), /L'Euromillions est tiré le mardi et le vendredi/);
+  assert.equal(validateDrawDate('2026-10-12', now, 'eurodreams'), '2026-10-12'); // lundi
+  assert.equal(validateDrawDate('2026-10-15', now, 'eurodreams'), '2026-10-15'); // jeudi
+  assert.throws(() => validateDrawDate('2026-10-14', now, 'eurodreams'), /EuroDreams est tiré le lundi et le jeudi/);
+});

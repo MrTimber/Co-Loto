@@ -6,10 +6,14 @@
   --border: #dde3ee;
   --accent: #0f766e;
   --accent-soft: #ccfbf1;
+  --accent-text: #fff;
   --pending: #f59e0b;
   --pending-soft: #fef3c7;
-  --chance: #e11d48;
-  --chance-soft: #ffe4e6;
+  --bonus: #e11d48;
+  --bonus-text: #fff;
+  --theme-from: var(--bg);
+  --theme-to: var(--bg);
+  --on-theme: var(--text);
   --picked: #e5e9f2;
   --danger: #b42318;
   --radius: 12px;
@@ -25,13 +29,25 @@
     --border: #2b3547;
     --accent: #2dd4bf;
     --accent-soft: #134e4a;
+    --accent-text: #0f1420;
     --pending: #fbbf24;
     --pending-soft: #4a3a10;
-    --chance: #fb7185;
-    --chance-soft: #4c1d2a;
+    --bonus: #fb7185;
+    --bonus-text: #fff;
     --picked: #263045;
     --danger: #f97066;
   }
+}
+
+/* Dégradés de fond inspirés des tuiles de chaque jeu sur fdj.fr (aucun logo repris). */
+[data-game=loto] { --theme-from: #00a3da; --theme-to: #00cfee; --accent: #0369a1; --accent-soft: #e0f2fe; --bonus: #e11d48; }
+[data-game=euromillions] { --theme-from: #001469; --theme-to: #002b9f; --accent: #1e3a8a; --accent-soft: #dbeafe; --bonus: #f5b301; --bonus-text: #1d2433; }
+[data-game=eurodreams] { --theme-from: #791fa7; --theme-to: #982ecf; --accent: #7e22ce; --accent-soft: #f3e8ff; --bonus: #db2777; }
+body[data-game] { --on-theme: #fff; }
+@media (prefers-color-scheme: dark) {
+  [data-game=loto] { --accent: #38bdf8; --accent-soft: #0c3a52; }
+  [data-game=euromillions] { --accent: #60a5fa; --accent-soft: #172554; }
+  [data-game=eurodreams] { --accent: #c084fc; --accent-soft: #3b0764; }
 }
 
 * { box-sizing: border-box; }
@@ -41,7 +57,7 @@ body {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background: var(--bg);
+  background: linear-gradient(90deg, var(--theme-from), var(--theme-to)) var(--bg);
   color: var(--text);
   font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
@@ -60,7 +76,9 @@ h2 { font-size: 1.15rem; margin: 0 0 .75rem; }
   background: var(--surface);
 }
 .logo { font-weight: 800; font-size: 1.3rem; text-decoration: none; color: var(--accent); }
-.site-footer { margin-top: auto; padding: 1.5rem 1rem; text-align: center; font-size: .85rem; color: var(--muted); }
+.site-footer { margin-top: auto; padding: 1.5rem 1rem; text-align: center; font-size: .85rem; color: var(--on-theme); opacity: .85; }
+.site-footer a { color: inherit; }
+.intro { color: var(--on-theme); }
 
 .container { width: 100%; max-width: 1100px; margin: 0 auto; padding: 1.5rem 1rem; }
 .intro { max-width: 680px; margin-bottom: 1.5rem; }
@@ -99,7 +117,7 @@ button, .button {
   text-decoration: none;
   cursor: pointer;
 }
-button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); font-weight: 600; }
 button.link { border: 0; background: none; color: var(--muted); text-decoration: underline; }
 button:disabled { opacity: .5; cursor: not-allowed; }
 .actions, .invite-actions { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
@@ -119,8 +137,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .game-status { margin-bottom: 1rem; }
 .banner { background: var(--accent-soft); border-radius: var(--radius); padding: .75rem 1rem; margin: 0 0 1rem; }
 
-.grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: .35rem; }
-.grid.chance { grid-template-columns: repeat(5, 1fr); }
+.grid { display: grid; grid-template-columns: repeat(var(--columns, 7), 1fr); gap: .35rem; }
 .cell {
   display: flex;
   align-items: center;
@@ -137,9 +154,8 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 button.cell:hover:not(:disabled) { border-color: var(--accent); }
 .cell.picked { background: var(--picked); color: var(--muted); opacity: 1; cursor: default; text-decoration: line-through; }
 .cell.pending { background: var(--pending-soft); border: 2px solid var(--pending); }
-.cell.validated { background: var(--accent); border-color: var(--accent); color: #fff; text-decoration: none; }
-.cell.chance-validated { background: var(--chance); border-color: var(--chance); color: #fff; }
-#personal-grid.chance .cell.validated { background: var(--chance); border-color: var(--chance); }
+.cell.validated { background: var(--accent); border-color: var(--accent); color: var(--accent-text); text-decoration: none; }
+.cell.bonus-validated, #personal-grid.bonus .cell.validated { background: var(--bonus); border-color: var(--bonus); color: var(--bonus-text); }
 
 .summary { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: 1rem; }
 .summary.big { justify-content: center; margin: 1rem 0 1.5rem; }
@@ -155,5 +171,32 @@ button.cell:hover:not(:disabled) { border-color: var(--accent); }
   color: #fff;
 }
 .summary.big .ball { width: 3.2rem; height: 3.2rem; font-size: 1.3rem; }
-.ball.chance { background: var(--chance); }
+.ball.bonus { background: var(--bonus); color: var(--bonus-text); }
+
+.game-picker { display: grid; grid-template-columns: repeat(3, 1fr); gap: .5rem; }
+.game-picker legend { grid-column: 1 / -1; }
+form label.game-option {
+  margin: 0;
+  padding: .7rem .5rem;
+  border-radius: 8px;
+  border: 3px solid transparent;
+  background: linear-gradient(90deg, var(--theme-from), var(--theme-to));
+  color: #fff;
+  font-weight: 700;
+  text-align: center;
+  cursor: pointer;
+}
+.game-option input { position: absolute; opacity: 0; pointer-events: none; }
+.game-option:has(input:checked) { border-color: var(--text); box-shadow: 0 0 0 2px var(--surface) inset; }
+.game-option:has(input:focus-visible) { outline: 2px solid var(--text); outline-offset: 2px; }
+.game-badge {
+  display: inline-block;
+  margin: 0 0 .5rem;
+  padding: .15rem .7rem;
+  border-radius: 99px;
+  background: linear-gradient(90deg, var(--theme-from), var(--theme-to));
+  color: #fff;
+  font-weight: 700;
+  font-size: .85rem;
+}
 .banner .ball { width: 1.9rem; height: 1.9rem; font-size: .9rem; }

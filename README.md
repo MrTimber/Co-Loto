@@ -1,6 +1,6 @@
 # Co-Loto
 
-**Co-Loto** est une application web gratuite qui permet de co-créer une grille de Loto à plusieurs, comme dans une partie de jeu multijoueur.
+**Co-Loto** est une application web gratuite qui permet de co-créer une grille de Loto, d'Euromillions ou d'EuroDreams à plusieurs, comme dans une partie de jeu multijoueur.
 
 > ⚠️ Co-Loto n'a **aucune affiliation** avec la Française des Jeux ([fdj.fr](https://www.fdj.fr/)). Le site ne vend aucun ticket et ne prend aucun pari : il aide seulement un groupe à choisir ensemble les numéros d'une grille.
 
@@ -37,10 +37,19 @@ L'écran affiche deux grilles :
 2. Le tour se termine quand tous les participants ont fait leur choix.
 3. Le système examine alors l'ensemble des grilles personnelles : tout numéro choisi par **tous** les joueurs (tous tours confondus) est **validé** et apparaît sur la grille collective.
 
-### 4. Les 5 numéros, puis le numéro chance
+### 4. Les numéros, puis les numéros complémentaires
 
-- Une fois que la grille collective contient **5 numéros**, la partie passe au choix du **numéro chance**, selon le même principe.
-- Quand un numéro chance est validé collectivement, **la partie est terminée**.
+Le jeu est choisi à la création du salon :
+
+| Jeu | Numéros | Puis | Tirages |
+|---|---|---|---|
+| Loto | 5 parmi 1 à 49 | 1 numéro chance parmi 1 à 10 | lundi, mercredi, samedi |
+| Euromillions | 5 parmi 1 à 50 | 2 étoiles parmi 1 à 12 | mardi, vendredi |
+| EuroDreams | 6 parmi 1 à 40 | 1 numéro Dream parmi 1 à 5 | lundi, jeudi |
+
+- Une fois que la grille collective contient tous ses numéros, la partie passe aux numéros complémentaires, selon le même principe.
+- Quand le dernier numéro complémentaire est validé collectivement, **la partie est terminée**.
+- Le fond de page reprend le dégradé de couleur du jeu choisi.
 
 ### 5. Après la partie
 
@@ -56,9 +65,10 @@ L'écran affiche deux grilles :
 - [x] Salle d'attente en temps réel
 - [x] Grille personnelle et grille collective synchronisées
 - [x] Validation des numéros par consensus
-- [x] Choix du numéro chance
+- [x] Choix du numéro chance, des étoiles ou du numéro Dream
+- [x] Loto, Euromillions et EuroDreams
 - [x] Page de consultation de la grille (30 jours, URL unique)
-- [x] Date de tirage optionnelle (lundi, mercredi ou samedi)
+- [x] Date de tirage optionnelle (limitée aux jours de tirage du jeu)
 - [ ] Vérification des résultats officiels à la date du tirage
 - [ ] Envoi des résultats par email (avec consentement)
 
@@ -67,7 +77,7 @@ L'écran affiche deux grilles :
 - Pendant un tour, chaque joueur peut changer son choix tant que tous les joueurs n'ont pas choisi.
 - Les choix des autres joueurs restent secrets : on voit seulement qui a déjà choisi.
 - Si plusieurs numéros deviennent unanimes au même tour alors qu'il reste moins de places, un tirage au sort départage les candidats.
-- Les choix du numéro chance repartent de zéro : ce sont des numéros de 1 à 10, indépendants des 5 numéros.
+- Les choix des numéros complémentaires repartent de zéro : ils sont indépendants des numéros déjà choisis.
 - Un joueur qui ferme sa page peut revenir avec le même lien (son navigateur garde un jeton). S'il reste déconnecté plus de 90 secondes, il quitte la partie et le tour continue sans lui. Si le créateur part, le rôle passe au joueur suivant.
 
 ## Stack technique

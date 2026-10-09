@@ -1,4 +1,5 @@
-import { saveToken, formatDrawDate, escapeHtml } from './common.js';
+import { saveToken, formatDrawDate, escapeHtml, rulesFor, applyTheme, describeGame } from './common.js';
+import { GAMES } from './games.js';
 
 const form = document.getElementById('create-form');
 const errorBox = document.getElementById('create-error');
@@ -7,6 +8,16 @@ const select = form.elements.maxPlayers;
 for (let n = 2; n <= 12; n++) select.add(new Option(`${n} joueurs`, n, n === 3, n === 3));
 form.elements.name.value = localStorage.getItem('coloto:name') ?? '';
 form.elements.drawDate.min = new Date().toISOString().slice(0, 10);
+
+// Le choix du jeu change le fond de page, le principe affiché et les jours de tirage.
+function selectGame() {
+  const rules = rulesFor(form.elements.gameType.value);
+  applyTheme(rules.id);
+  document.getElementById('game-summary').textContent = `${describeGame(rules)[0].toUpperCase()}${describeGame(rules).slice(1)}`;
+  document.getElementById('draw-days').textContent = `(optionnel : ${rules.theName} est tiré ${rules.drawDays})`;
+}
+form.elements.gameType.forEach((radio) => radio.addEventListener('change', selectGame));
+selectGame();
 
 form.addEventListener('submit', async (event) => {
   event.preventDefault();
@@ -40,7 +51,7 @@ async function refreshLobbies() {
       ? lobbies
           .map(
             (l) => `<li><a href="/salon/${encodeURIComponent(l.id)}">
-              <strong>Salon de ${escapeHtml(l.host)}</strong>
+              <strong>${escapeHtml(GAMES[l.gameType]?.name ?? '')} · salon de ${escapeHtml(l.host)}</strong>
               <span>${l.players}/${l.maxPlayers} joueurs${l.drawDate ? ` · tirage du ${formatDrawDate(l.drawDate)}` : ''}</span>
             </a></li>`,
           )

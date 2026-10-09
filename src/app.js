@@ -6,7 +6,9 @@ import express from 'express';
 import { Server } from 'socket.io';
 import {
   GameError,
+  DEFAULT_GAME,
   DEFAULT_MAX_PLAYERS,
+  GAMES,
   createGame,
   addPlayer,
   removePlayer,
@@ -18,6 +20,7 @@ import {
 import { validateDrawDate } from './drawDate.js';
 
 const PUBLIC_DIR = fileURLToPath(new URL('../public/', import.meta.url));
+const GAMES_MODULE = fileURLToPath(new URL('./games.js', import.meta.url));
 
 const newId = (bytes) => randomBytes(bytes).toString('base64url');
 
@@ -33,6 +36,8 @@ export function createApp({
   const app = express();
   app.disable('x-powered-by');
   app.use(express.json({ limit: '4kb' }));
+  // Les règles des jeux sont partagées avec le navigateur.
+  app.get('/js/games.js', (req, res) => res.sendFile(GAMES_MODULE));
   app.use(express.static(PUBLIC_DIR, { extensions: ['html'] }));
 
   app.get('/salon/:id', (req, res) => res.sendFile('salon.html', { root: PUBLIC_DIR }));
@@ -45,6 +50,7 @@ export function createApp({
       if (game.visibility !== 'public' || game.status !== 'lobby' || game.players.length >= game.maxPlayers) continue;
       lobbies.push({
         id,
+        gameType: game.gameType,
         host: findPlayer(game, game.hostId)?.name ?? '',
         players: game.players.length,
         maxPlayers: game.maxPlayers,
@@ -58,9 +64,10 @@ export function createApp({
     if (rooms.size >= maxRooms) {
       return res.status(503).json({ error: 'Trop de salons sont ouverts, réessayez dans quelques minutes.' });
     }
-    const { name, maxPlayers = DEFAULT_MAX_PLAYERS, visibility = 'private', drawDate } = req.body ?? {};
+    const { name, gameType = DEFAULT_GAME, maxPlayers = DEFAULT_MAX_PLAYERS, visibility = 'private', drawDate } = req.body ?? {};
     try {
-      const game = createGame({ maxPlayers: Number(maxPlayers), visibility, drawDate: validateDrawDate(drawDate) });
+      const game = createGame({ gameType, maxPlayers: Number(maxPlayers), visibility });
+      game.drawDate = validateDrawDate(drawDate, new Date(), game.gameType);
       const id = newId(9);
       const room = { id, game, tokens: new Map(), sockets: new Set(), offlineTimers: new Map(), closeTimer: null };
       const { playerId, token } = joinAsNewPlayer(room, name);
@@ -122,8 +129,9 @@ export function createApp({
     if (game.status === 'finished' && !room.closeTimer) {
       store.saveGrid({
         id: room.id,
+        gameType: game.gameType,
         numbers: game.validated.numbers,
-        chance: game.validated.chance[0],
+        bonus: game.validated[GAMES[game.gameType].phases[1].key],
         players: game.players.map((p) => p.name),
         rounds: game.rounds.length,
         drawDate: game.drawDate,

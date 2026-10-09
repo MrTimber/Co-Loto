@@ -20,16 +20,32 @@ export function openStore(file = ':memory:') {
       rounds INTEGER NOT NULL
     )
   `);
+  // Colonnes ajoutées avec l'Euromillions et EuroDreams : les grilles plus anciennes sont des grilles de Loto.
+  const columns = db.prepare('PRAGMA table_info(grids)').all().map((c) => c.name);
+  if (!columns.includes('game_type')) db.exec("ALTER TABLE grids ADD COLUMN game_type TEXT NOT NULL DEFAULT 'loto'");
+  if (!columns.includes('bonus')) db.exec('ALTER TABLE grids ADD COLUMN bonus TEXT');
   const insert = db.prepare(`
-    INSERT OR REPLACE INTO grids (id, created_at, expires_at, draw_date, numbers, chance, players, rounds)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT OR REPLACE INTO grids (id, created_at, expires_at, draw_date, game_type, numbers, bonus, chance, players, rounds)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   const select = db.prepare('SELECT * FROM grids WHERE id = ? AND expires_at > ?');
   const purge = db.prepare('DELETE FROM grids WHERE expires_at <= ?');
 
   return {
-    saveGrid({ id, numbers, chance, players, rounds, drawDate = null }, now = Date.now()) {
-      insert.run(id, now, now + GRID_LIFETIME_MS, drawDate, JSON.stringify(numbers), chance, JSON.stringify(players), rounds);
+    // `bonus` : numéros complémentaires (numéro chance, étoiles ou numéro Dream).
+    saveGrid({ id, gameType = 'loto', numbers, bonus, players, rounds, drawDate = null }, now = Date.now()) {
+      insert.run(
+        id,
+        now,
+        now + GRID_LIFETIME_MS,
+        drawDate,
+        gameType,
+        JSON.stringify(numbers),
+        JSON.stringify(bonus),
+        bonus[0], // ancienne colonne, conservée pour les bases existantes
+        JSON.stringify(players),
+        rounds,
+      );
     },
     getGrid(id, now = Date.now()) {
       const row = select.get(id, now);
@@ -39,8 +55,9 @@ export function openStore(file = ':memory:') {
         createdAt: new Date(row.created_at).toISOString(),
         expiresAt: new Date(row.expires_at).toISOString(),
         drawDate: row.draw_date,
+        gameType: row.game_type,
         numbers: JSON.parse(row.numbers),
-        chance: row.chance,
+        bonus: row.bonus ? JSON.parse(row.bonus) : [row.chance],
         players: JSON.parse(row.players),
         rounds: row.rounds,
       };

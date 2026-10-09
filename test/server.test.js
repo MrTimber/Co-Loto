@@ -49,6 +49,7 @@ test('création de salon : validation des paramètres', async () => {
   assert.equal((await api('/api/rooms', { name: 'Alice', maxPlayers: 13 })).status, 400);
   assert.equal((await api('/api/rooms', { name: '' })).status, 400);
   assert.equal((await api('/api/rooms', { name: 'Alice', drawDate: '2020-01-01' })).status, 400);
+  assert.equal((await api('/api/rooms', { name: 'Alice', gameType: 'keno' })).status, 400);
 });
 
 test('une partie complète, du salon à la grille consultable', async () => {
@@ -89,7 +90,8 @@ test('une partie complète, du salon à la grille consultable', async () => {
   const grid = await api(`/api/grilles/${roomId}`);
   assert.equal(grid.status, 200);
   assert.deepEqual(grid.body.numbers, [3, 14, 15, 26, 49]);
-  assert.equal(grid.body.chance, 8);
+  assert.equal(grid.body.gameType, 'loto');
+  assert.deepEqual(grid.body.bonus, [8]);
   assert.deepEqual(grid.body.players, ['Alice', 'Bob']);
   assert.equal(grid.body.rounds, 6);
 
@@ -121,6 +123,33 @@ test('un joueur déconnecté trop longtemps est retiré, et un salon vide est fe
   assert.equal(lastState(bob).hostId, lastState(bob).me.id);
   assert.equal((await emit(bob, 'room:leave')).ok, true);
   assert.equal(rooms.has(roomId), false);
+});
+
+test('une partie d’Euromillions enregistre ses 2 étoiles', async () => {
+  const { roomId, token } = (await api('/api/rooms', { name: 'Alice', maxPlayers: 2, gameType: 'euromillions', visibility: 'public' })).body;
+  assert.equal((await api('/api/lobbies')).body.find((l) => l.id === roomId).gameType, 'euromillions');
+  const alice = client();
+  await emit(alice, 'room:join', { roomId, token });
+  const bob = client();
+  await emit(bob, 'room:join', { roomId, name: 'Bob' });
+  await emit(alice, 'game:start');
+  for (const n of [5, 10, 20, 40, 50, 2, 11]) {
+    await emit(alice, 'game:pick', { number: n });
+    await emit(bob, 'game:pick', { number: n });
+  }
+  await waitFor(() => lastState(alice)?.status === 'finished');
+  assert.equal(lastState(alice).gameType, 'euromillions');
+  const grid = await api(`/api/grilles/${roomId}`);
+  assert.deepEqual(grid.body.numbers, [5, 10, 20, 40, 50]);
+  assert.deepEqual(grid.body.bonus, [2, 11]);
+  assert.equal(grid.body.gameType, 'euromillions');
+});
+
+test('les règles des jeux sont servies au navigateur', async () => {
+  const res = await fetch(`${baseUrl}/js/games.js`);
+  assert.equal(res.status, 200);
+  assert.match(res.headers.get('content-type'), /javascript/);
+  assert.match(await res.text(), /eurodreams/);
 });
 
 test('une grille inconnue renvoie 404', async () => {

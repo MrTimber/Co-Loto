@@ -1,10 +1,9 @@
 // Logique de jeu de Co-Loto, sans aucune dépendance réseau.
 // Toutes les fonctions modifient l'objet `game` passé en paramètre.
 
-export const PHASES = {
-  numbers: { min: 1, max: 49, count: 5 },
-  chance: { min: 1, max: 10, count: 1 },
-};
+import { GAMES, DEFAULT_GAME, getGame, findPhase } from './games.js';
+
+export { GAMES, DEFAULT_GAME };
 
 export const MIN_PLAYERS = 2;
 export const MAX_PLAYERS_LIMIT = 12;
@@ -18,7 +17,12 @@ export class GameError extends Error {
   }
 }
 
-export function createGame({ maxPlayers = DEFAULT_MAX_PLAYERS, visibility = 'private', drawDate = null } = {}) {
+const emptyPicks = (rules) => Object.fromEntries(rules.phases.map((p) => [p.key, []]));
+const copyPicks = (picks) => Object.fromEntries(Object.entries(picks).map(([key, list]) => [key, [...list]]));
+
+export function createGame({ gameType = DEFAULT_GAME, maxPlayers = DEFAULT_MAX_PLAYERS, visibility = 'private', drawDate = null } = {}) {
+  const rules = getGame(gameType);
+  if (!rules) throw new GameError('invalid_game_type', 'Choisissez le Loto, l’Euromillions ou EuroDreams.');
   if (!Number.isInteger(maxPlayers) || maxPlayers < MIN_PLAYERS || maxPlayers > MAX_PLAYERS_LIMIT) {
     throw new GameError('invalid_max_players', `Le nombre de joueurs doit être compris entre ${MIN_PLAYERS} et ${MAX_PLAYERS_LIMIT}.`);
   }
@@ -27,14 +31,15 @@ export function createGame({ maxPlayers = DEFAULT_MAX_PLAYERS, visibility = 'pri
   }
   return {
     status: 'lobby', // lobby | playing | finished | abandoned
-    phase: null, // numbers | chance
+    gameType,
+    phase: null, // clé d'une des phases du jeu (numbers, puis chance, stars ou dream)
     round: 0,
     maxPlayers,
     visibility,
     drawDate,
     hostId: null,
     players: [],
-    validated: { numbers: [], chance: [] },
+    validated: emptyPicks(rules),
     lastRound: null,
     rounds: [],
   };
@@ -61,7 +66,7 @@ export function addPlayer(game, { id, name }) {
   if (game.players.some((p) => p.name.toLowerCase() === cleanName.toLowerCase())) {
     throw new GameError('name_taken', 'Ce pseudo est déjà utilisé dans ce salon.');
   }
-  const player = { id, name: cleanName, picks: { numbers: [], chance: [] }, pending: null };
+  const player = { id, name: cleanName, picks: emptyPicks(GAMES[game.gameType]), pending: null };
   game.players.push(player);
   if (!game.hostId) game.hostId = id;
   return player;
@@ -74,7 +79,7 @@ export function startGame(game, playerId) {
     throw new GameError('not_enough_players', `Il faut au moins ${MIN_PLAYERS} joueurs pour lancer la partie.`);
   }
   game.status = 'playing';
-  game.phase = 'numbers';
+  game.phase = GAMES[game.gameType].phases[0].key;
   game.round = 1;
 }
 
@@ -84,7 +89,7 @@ export function pick(game, playerId, number, rng = Math.random) {
   if (game.status !== 'playing') throw new GameError('not_playing', "La partie n'est pas en cours.");
   const player = findPlayer(game, playerId);
   if (!player) throw new GameError('not_a_player', 'Vous ne participez pas à cette partie.');
-  const { min, max } = PHASES[game.phase];
+  const { min, max } = phaseRules(game);
   if (!Number.isInteger(number) || number < min || number > max) {
     throw new GameError('invalid_number', `Choisissez un numéro entre ${min} et ${max}.`);
   }
@@ -126,7 +131,8 @@ function endRound(game, rng) {
 
   const validated = game.validated[phase];
   const candidates = commonPicks(game.players, phase).filter((n) => !validated.includes(n));
-  const slots = PHASES[phase].count - validated.length;
+  const { count } = phaseRules(game);
+  const slots = count - validated.length;
   // Plusieurs numéros peuvent devenir unanimes au même tour : s'il y en a plus
   // que de places restantes, un tirage au sort départage les candidats.
   const newlyValidated = candidates.length > slots ? shuffle(candidates, rng).slice(0, slots) : candidates;
@@ -137,9 +143,11 @@ function endRound(game, rng) {
   game.rounds.push(result);
   game.lastRound = result;
 
-  if (validated.length >= PHASES[phase].count) {
-    if (phase === 'numbers') {
-      game.phase = 'chance';
+  if (validated.length >= count) {
+    const phases = GAMES[game.gameType].phases;
+    const next = phases[phases.findIndex((p) => p.key === phase) + 1];
+    if (next) {
+      game.phase = next.key;
     } else {
       game.status = 'finished';
       game.phase = null;
@@ -148,6 +156,10 @@ function endRound(game, rng) {
   }
   game.round += 1;
   return result;
+}
+
+function phaseRules(game) {
+  return findPhase(GAMES[game.gameType], game.phase);
 }
 
 export function commonPicks(players, phase) {
@@ -170,6 +182,7 @@ export function viewFor(game, viewerId) {
   const me = findPlayer(game, viewerId);
   return {
     status: game.status,
+    gameType: game.gameType,
     phase: game.phase,
     round: game.round,
     maxPlayers: game.maxPlayers,
@@ -177,10 +190,10 @@ export function viewFor(game, viewerId) {
     drawDate: game.drawDate,
     hostId: game.hostId,
     players: game.players.map((p) => ({ id: p.id, name: p.name, hasPicked: p.pending !== null })),
-    validated: { numbers: [...game.validated.numbers], chance: [...game.validated.chance] },
+    validated: copyPicks(game.validated),
     lastRound: game.lastRound
       ? { round: game.lastRound.round, phase: game.lastRound.phase, newlyValidated: game.lastRound.newlyValidated }
       : null,
-    me: me ? { id: me.id, name: me.name, picks: { numbers: [...me.picks.numbers], chance: [...me.picks.chance] }, pending: me.pending } : null,
+    me: me ? { id: me.id, name: me.name, picks: copyPicks(me.picks), pending: me.pending } : null,
   };
 }

@@ -1,4 +1,4 @@
-import { saveToken, loadToken, forgetToken, escapeHtml, formatDrawDate, ball } from './common.js';
+import { saveToken, loadToken, forgetToken, escapeHtml, formatDrawDate, ball, rulesFor, applyTheme, countLabel, gridBalls } from './common.js';
 
 const roomId = decodeURIComponent(location.pathname.split('/').pop());
 const socket = io({ transports: ['websocket', 'polling'] });
@@ -67,9 +67,7 @@ $('join-form').elements.name.value = localStorage.getItem('coloto:name') ?? '';
 
 const inviteUrl = `${location.origin}/salon/${encodeURIComponent(roomId)}`;
 $('invite-link').value = inviteUrl;
-$('mail-link').href = `mailto:?subject=${encodeURIComponent('Viens co-créer une grille de Loto avec moi')}&body=${encodeURIComponent(
-  `Rejoins mon salon Co-Loto pour choisir nos numéros ensemble : ${inviteUrl}`,
-)}`;
+const inviteText = (rules) => `Viens co-créer une grille ${rules.id === 'loto' ? 'de Loto' : rules.id === 'euromillions' ? "d'Euromillions" : "d'EuroDreams"} avec moi`;
 $('copy-link').addEventListener('click', async () => {
   try {
     await navigator.clipboard.writeText(inviteUrl);
@@ -81,7 +79,7 @@ $('copy-link').addEventListener('click', async () => {
 if (navigator.share) {
   $('share-link').hidden = false;
   $('share-link').addEventListener('click', () =>
-    navigator.share({ title: 'Co-Loto', text: 'Viens co-créer une grille de Loto avec moi', url: inviteUrl }).catch(() => {}),
+    navigator.share({ title: 'Co-Loto', text: inviteText(rulesFor(state?.gameType)), url: inviteUrl }).catch(() => {}),
   );
 }
 
@@ -104,6 +102,7 @@ $('leave-lobby').addEventListener('click', () => {
 
 function render() {
   if (!state?.me) return;
+  applyTheme(state.gameType);
   if (state.status === 'lobby') renderLobby();
   else if (state.status === 'playing') renderGame();
   else if (state.status === 'finished') renderFinished();
@@ -126,7 +125,11 @@ function renderLobby() {
   show('lobby');
   const isHost = state.hostId === state.me.id;
   const draw = state.drawDate ? ` · tirage prévu le ${formatDrawDate(state.drawDate)}` : '';
-  $('lobby-info').textContent = `${state.visibility === 'public' ? 'Salon public' : 'Salon privé'} · ${state.players.length}/${state.maxPlayers} joueurs${draw}`;
+  const rules = rulesFor(state.gameType);
+  $('mail-link').href = `mailto:?subject=${encodeURIComponent(inviteText(rules))}&body=${encodeURIComponent(
+    `Rejoins mon salon Co-Loto pour choisir nos numéros ensemble : ${inviteUrl}`,
+  )}`;
+  $('lobby-info').textContent = `${rules.name} · ${state.visibility === 'public' ? 'Salon public' : 'Salon privé'} · ${state.players.length}/${state.maxPlayers} joueurs${draw}`;
   $('lobby-players').innerHTML = playerList(state.players, { showPick: false });
   $('start-game').hidden = !isHost;
   $('start-game').disabled = state.players.length < 2;
@@ -139,10 +142,12 @@ function renderLobby() {
 
 function renderGame() {
   show('game');
-  const phase = state.phase;
-  const max = phase === 'numbers' ? 49 : 10;
+  const rules = rulesFor(state.gameType);
+  const phaseIndex = rules.phases.findIndex((p) => p.key === state.phase);
+  const phase = rules.phases[phaseIndex];
+  const validated = state.validated[phase.key];
   const waiting = state.players.filter((p) => !p.hasPicked).length;
-  $('round-label').textContent = `Tour ${state.round} · ${phase === 'numbers' ? `numéros (${state.validated.numbers.length}/5)` : 'numéro chance'}`;
+  $('round-label').textContent = `${rules.name} · Tour ${state.round} · ${capitalize(phase.many)} (${validated.length}/${phase.count})`;
   $('round-hint').textContent = waiting ? ` · en attente de ${waiting} joueur${waiting > 1 ? 's' : ''}` : '';
   $('game-players').innerHTML = playerList(state.players, { showPick: true });
 
@@ -150,18 +155,19 @@ function renderGame() {
   const hasNews = Boolean(last?.newlyValidated.length);
   $('last-round').hidden = !hasNews;
   if (hasNews) {
-    $('last-round').innerHTML = `Tour ${last.round} : ${last.newlyValidated.map((n) => ball(n, last.phase === 'chance' ? 'chance' : 'validated')).join(' ')} validé${last.newlyValidated.length > 1 ? 's' : ''} par tout le monde !`;
+    const ballClass = last.phase === rules.phases[0].key ? 'validated' : 'bonus';
+    $('last-round').innerHTML = `Tour ${last.round} : ${last.newlyValidated.map((n) => ball(n, ballClass)).join(' ')} validé${last.newlyValidated.length > 1 ? 's' : ''} par tout le monde !`;
   }
 
-  const mine = state.me.picks[phase];
-  const validated = state.validated[phase];
+  const isBonus = phaseIndex > 0;
+  const mine = state.me.picks[phase.key];
   $('personal-hint').textContent =
     state.me.pending !== null
       ? `Vous avez choisi le ${state.me.pending}. Vous pouvez changer d'avis jusqu'à la fin du tour.`
-      : `Choisissez un ${phase === 'numbers' ? 'numéro entre 1 et 49' : 'numéro chance entre 1 et 10'} que vous n'avez pas encore choisi.`;
+      : `Choisissez ${phase.feminine ? 'une' : 'un'} ${phase.one} entre ${phase.min} et ${phase.max} que vous n'avez pas encore choisi${e(phase)}.`;
   const grid = $('personal-grid');
-  grid.classList.toggle('chance', phase === 'chance');
-  grid.innerHTML = range(max)
+  setupGrid(grid, phase, isBonus);
+  grid.innerHTML = range(phase.min, phase.max)
     .map((n) => {
       const classes = ['cell'];
       if (mine.includes(n)) classes.push('picked');
@@ -172,27 +178,34 @@ function renderGame() {
     })
     .join('');
 
-  renderCollective(phase, max, validated);
+  renderCollective(rules, phase, isBonus, validated);
 }
 
-// La grille collective n'affiche que la phase en cours : les 49 numéros, puis les 10 numéros chance.
-function renderCollective(phase, max, validated) {
-  $('collective-hint').textContent =
-    phase === 'numbers'
-      ? `Numéros validés par tout le monde : ${validated.length} sur 5.`
-      : 'Le numéro chance validé par tout le monde terminera la grille.';
+function setupGrid(grid, phase, isBonus) {
+  grid.classList.toggle('bonus', isBonus);
+  grid.style.setProperty('--columns', phase.columns);
+}
+
+// La grille collective n'affiche que la phase en cours : les numéros, puis les numéros complémentaires.
+function renderCollective(rules, phase, isBonus, validated) {
+  const remaining = phase.count - validated.length;
+  $('collective-hint').textContent = isBonus
+    ? remaining > 1
+      ? `Les ${countLabel(phase, remaining)} validé${e(phase)}s par tout le monde termineront la grille.`
+      : `${phase.count > 1 ? (phase.feminine ? 'La dernière' : 'Le dernier') : phase.feminine ? 'La' : 'Le'} ${phase.one} validé${e(phase)} par tout le monde terminera la grille.`
+    : `${capitalize(phase.many)} validés par tout le monde : ${validated.length} sur ${phase.count}.`;
   const grid = $('collective-grid');
-  grid.classList.toggle('chance', phase === 'chance');
-  const validatedClass = phase === 'chance' ? 'chance-validated' : 'validated';
-  grid.innerHTML = range(max)
+  setupGrid(grid, phase, isBonus);
+  const validatedClass = isBonus ? 'bonus-validated' : 'validated';
+  grid.innerHTML = range(phase.min, phase.max)
     .map((n) => `<span class="cell ${validated.includes(n) ? validatedClass : ''}">${n}</span>`)
     .join('');
 }
 
 function renderFinished() {
   show('finished');
-  const { numbers, chance } = state.validated;
-  $('final-grid').innerHTML = numbers.map((n) => ball(n, 'validated')).join('') + ball(chance[0], 'chance');
+  const [numbers, bonus] = rulesFor(state.gameType).phases;
+  $('final-grid').innerHTML = gridBalls(state.validated[numbers.key], state.validated[bonus.key]);
   const url = `${location.origin}/grille/${encodeURIComponent(roomId)}`;
   $('grid-link').href = url;
   $('grid-link').textContent = url;
@@ -204,6 +217,9 @@ $('personal-grid').addEventListener('click', (event) => {
   act('game:pick', { number: Number(cell.dataset.number) }, 'game-error');
 });
 
-function range(n) {
-  return Array.from({ length: n }, (_, i) => i + 1);
+const e = (phase) => (phase.feminine ? 'e' : '');
+const capitalize = (text) => text[0].toUpperCase() + text.slice(1);
+
+function range(min, max) {
+  return Array.from({ length: max - min + 1 }, (_, i) => min + i);
 }

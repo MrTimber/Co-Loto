@@ -178,3 +178,39 @@ test('la vue d’un joueur cache les choix des autres', () => {
   assert.equal(JSON.stringify(view).includes('30'), false);
   assert.equal(view.lastRound.picks, undefined);
 });
+
+test('le type de jeu est validé, le Loto par défaut', () => {
+  assert.equal(createGame().gameType, 'loto');
+  throwsCode(() => createGame({ gameType: 'keno' }), 'invalid_game_type');
+  throwsCode(() => createGame({ gameType: 'toString' }), 'invalid_game_type');
+});
+
+test('Euromillions : 5 numéros de 1 à 50, puis 2 étoiles de 1 à 12', () => {
+  const game = setup(['Alice', 'Bob'], { gameType: 'euromillions' });
+  startGame(game, 'alice');
+  for (const n of [1, 12, 23, 34, 50]) playRound(game, { alice: n, bob: n });
+  assert.deepEqual(game.validated.numbers, [1, 12, 23, 34, 50]);
+  assert.equal(game.phase, 'stars');
+  throwsCode(() => pick(game, 'alice', 13), 'invalid_number');
+  playRound(game, { alice: 12, bob: 12 });
+  assert.equal(game.status, 'playing');
+  assert.equal(game.phase, 'stars');
+  playRound(game, { alice: 3, bob: 3 });
+  assert.equal(game.status, 'finished');
+  assert.deepEqual(game.validated.stars, [3, 12]);
+  assert.deepEqual(viewFor(game, 'alice').validated, { numbers: [1, 12, 23, 34, 50], stars: [3, 12] });
+});
+
+test('EuroDreams : 6 numéros de 1 à 40, puis 1 numéro Dream de 1 à 5', () => {
+  const game = setup(['Alice', 'Bob'], { gameType: 'eurodreams' });
+  startGame(game, 'alice');
+  throwsCode(() => pick(game, 'alice', 41), 'invalid_number');
+  for (const n of [2, 4, 8, 16, 32]) playRound(game, { alice: n, bob: n });
+  assert.equal(game.phase, 'numbers');
+  playRound(game, { alice: 40, bob: 40 });
+  assert.equal(game.phase, 'dream');
+  throwsCode(() => pick(game, 'alice', 6), 'invalid_number');
+  playRound(game, { alice: 5, bob: 5 });
+  assert.equal(game.status, 'finished');
+  assert.deepEqual(game.validated, { numbers: [2, 4, 8, 16, 32, 40], dream: [5] });
+});
