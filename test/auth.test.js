@@ -6,54 +6,54 @@ import { createApp } from '../src/app.js';
 import { openStore, GRID_LIFETIME_MS } from '../src/store.js';
 import { enabledProviders, parseCookies, cleanName, isEmail } from '../src/auth.js';
 
-test('comptes, sessions et grilles rattachées dans le stockage', () => {
-  const store = openStore();
+test('comptes, sessions et grilles rattachées dans le stockage', async () => {
+  const store = await openStore();
   const now = Date.UTC(2026, 9, 9);
-  store.saveGrid({ id: 'g1', numbers: [1, 2, 3, 4, 5], bonus: [6], players: ['Alice', 'Bob'], rounds: 6, participants: [{ token: 'ta', name: 'Alice' }, { token: 'tb', name: 'Bob' }] }, now);
+  await store.saveGrid({ id: 'g1', numbers: [1, 2, 3, 4, 5], bonus: [6], players: ['Alice', 'Bob'], rounds: 6, participants: [{ token: 'ta', name: 'Alice' }, { token: 'tb', name: 'Bob' }] }, now);
 
-  const alice = store.upsertUser({ provider: 'github', providerId: '42', name: 'Alice' }, now);
+  const alice = await store.upsertUser({ provider: 'github', providerId: '42', name: 'Alice' }, now);
   assert.equal(alice.email, null);
   // Connexion suivante : même compte, le pseudo choisi est gardé, l'email du fournisseur complète le compte.
-  const again = store.upsertUser({ provider: 'github', providerId: '42', name: 'alice-gh', email: 'alice@example.com', emailVerified: true }, now);
+  const again = await store.upsertUser({ provider: 'github', providerId: '42', name: 'alice-gh', email: 'alice@example.com', emailVerified: true }, now);
   assert.equal(again.id, alice.id);
   assert.equal(again.name, 'Alice');
   assert.equal(again.email, 'alice@example.com');
   assert.equal(again.emailVerified, true);
-  const bob = store.upsertUser({ provider: 'google', providerId: '42', name: 'Bob' }, now);
+  const bob = await store.upsertUser({ provider: 'google', providerId: '42', name: 'Bob' }, now);
   assert.notEqual(bob.id, alice.id);
 
-  const session = store.createSession(alice.id, now);
-  assert.equal(store.getSessionUser(session, now + 1000).name, 'Alice');
+  const session = await store.createSession(alice.id, now);
+  assert.equal((await store.getSessionUser(session, now + 1000)).name, 'Alice');
 
-  store.updateUser(alice.id, { name: 'Ali', email: 'alice@example.com', emailConsent: true });
-  assert.deepEqual(store.getSessionUser(session, now), { id: alice.id, provider: 'github', name: 'Ali', email: 'alice@example.com', emailVerified: true, emailConsent: true });
-  store.updateUser(alice.id, { name: 'Ali', email: 'autre@example.com', emailConsent: true });
-  assert.equal(store.getSessionUser(session, now).emailVerified, false); // adresse changée à la main
-  store.updateUser(alice.id, { name: 'Ali', email: null, emailConsent: true });
-  assert.equal(store.getSessionUser(session, now).emailConsent, false); // pas d'envoi sans adresse
-  assert.equal(store.getSessionUser('inconnu', now), null);
+  await store.updateUser(alice.id, { name: 'Ali', email: 'alice@example.com', emailConsent: true });
+  assert.deepEqual(await store.getSessionUser(session, now), { id: alice.id, provider: 'github', name: 'Ali', email: 'alice@example.com', emailVerified: true, emailConsent: true });
+  await store.updateUser(alice.id, { name: 'Ali', email: 'autre@example.com', emailConsent: true });
+  assert.equal((await store.getSessionUser(session, now)).emailVerified, false); // adresse changée à la main
+  await store.updateUser(alice.id, { name: 'Ali', email: null, emailConsent: true });
+  assert.equal((await store.getSessionUser(session, now)).emailConsent, false); // pas d'envoi sans adresse
+  assert.equal(await store.getSessionUser('inconnu', now), null);
 
-  assert.equal(store.claimGrid(alice.id, 'g1', 'mauvais', now), false);
-  assert.equal(store.claimGrid(alice.id, 'autre', 'ta', now), false);
-  assert.equal(store.claimGrid(alice.id, 'g1', 'ta', now), true);
-  assert.equal(store.claimGrid(alice.id, 'g1', 'ta', now), true); // sans effet, déjà à elle
-  assert.equal(store.claimGrid(bob.id, 'g1', 'ta', now), false); // déjà liée à un autre compte
-  const [grid] = store.listUserGrids(alice.id, now);
+  assert.equal(await store.claimGrid(alice.id, 'g1', 'mauvais', now), false);
+  assert.equal(await store.claimGrid(alice.id, 'autre', 'ta', now), false);
+  assert.equal(await store.claimGrid(alice.id, 'g1', 'ta', now), true);
+  assert.equal(await store.claimGrid(alice.id, 'g1', 'ta', now), true); // sans effet, déjà à elle
+  assert.equal(await store.claimGrid(bob.id, 'g1', 'ta', now), false); // déjà liée à un autre compte
+  const [grid] = await store.listUserGrids(alice.id, now);
   assert.equal(grid.id, 'g1');
   assert.equal(grid.playerName, 'Alice');
-  assert.deepEqual(store.listUserGrids(bob.id, now), []);
+  assert.deepEqual(await store.listUserGrids(bob.id, now), []);
 
-  assert.equal(store.forgetUserGrid(alice.id, 'g1'), true);
-  assert.deepEqual(store.listUserGrids(alice.id, now), []);
-  assert.equal(store.claimGrid(bob.id, 'g1', 'tb', now), true);
+  assert.equal(await store.forgetUserGrid(alice.id, 'g1'), true);
+  assert.deepEqual(await store.listUserGrids(alice.id, now), []);
+  assert.equal(await store.claimGrid(bob.id, 'g1', 'tb', now), true);
 
   // Au bout de 30 jours, la grille et ses liens disparaissent, et ne peuvent plus être rattachés.
-  assert.deepEqual(store.listUserGrids(bob.id, now + GRID_LIFETIME_MS), []);
-  assert.equal(store.claimGrid(alice.id, 'g1', 'ta', now + GRID_LIFETIME_MS), false);
-  store.purgeExpired(now + GRID_LIFETIME_MS);
+  assert.deepEqual(await store.listUserGrids(bob.id, now + GRID_LIFETIME_MS), []);
+  assert.equal(await store.claimGrid(alice.id, 'g1', 'ta', now + GRID_LIFETIME_MS), false);
+  await store.purgeExpired(now + GRID_LIFETIME_MS);
 
-  store.deleteUser(alice.id);
-  assert.equal(store.getSessionUser(session, now), null);
+  await store.deleteUser(alice.id);
+  assert.equal(await store.getSessionUser(session, now), null);
   store.close();
 });
 
@@ -93,7 +93,7 @@ const env = {
 };
 
 before(async () => {
-  server = createApp({ store: openStore(), env }).httpServer;
+  server = createApp({ store: await openStore(), env }).httpServer;
   await new Promise((resolve) => server.listen(0, resolve));
   baseUrl = `http://localhost:${server.address().port}`;
 });

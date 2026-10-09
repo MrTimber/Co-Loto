@@ -141,12 +141,12 @@ export function createAuth({ store, env = process.env, findRoomId = () => undefi
 
   // Adresse de retour après connexion : une page connue de ce site, reconstruite à partir
   // de nos propres données (jamais l'adresse reçue telle quelle).
-  function returnPath(value) {
+  async function returnPath(value) {
     if (typeof value !== 'string') return DEFAULT_RETURN;
     const known = STATIC_RETURNS.get(value);
     if (known) return known;
     const grid = /^\/grille\/([\w-]{1,40})$/.exec(value);
-    const gridId = grid && store.getGrid(grid[1])?.id;
+    const gridId = grid && (await store.getGrid(grid[1]))?.id;
     if (gridId) return `/grille/${gridId}`;
     const room = /^\/salon\/([\w-]{1,40})$/.exec(value);
     const roomId = room && findRoomId(room[1]);
@@ -192,23 +192,23 @@ export function createAuth({ store, env = process.env, findRoomId = () => undefi
 
   // Pseudo d'un nouveau compte : celui du fournisseur s'il en a un (GitHub, Discord),
   // sinon celui que le joueur utilise déjà dans ses parties.
-  function logIn(req, res, { provider, providerId, pseudo, email = null, emailVerified = Boolean(email) }) {
-    const user = store.upsertUser({ provider, providerId, name: cleanName(pseudo) || 'Joueur', email, emailVerified });
-    res.cookie(SESSION_COOKIE, store.createSession(user.id), cookieOptions(req, 30 * 24 * 60 * 60_000));
+  async function logIn(req, res, { provider, providerId, pseudo, email = null, emailVerified = Boolean(email) }) {
+    const user = await store.upsertUser({ provider, providerId, name: cleanName(pseudo) || 'Joueur', email, emailVerified });
+    res.cookie(SESSION_COOKIE, await store.createSession(user.id), cookieOptions(req, 30 * 24 * 60 * 60_000));
   }
 
-  function requireUser(req, res, next) {
-    const user = currentUser(req);
+  async function requireUser(req, res, next) {
+    const user = await currentUser(req);
     if (!user) return res.status(401).json({ error: 'Connectez-vous pour retrouver vos grilles.' });
     req.user = user;
     next();
   }
 
-  router.get('/auth/dev', (req, res, next) => {
+  router.get('/auth/dev', async (req, res, next) => {
     if (!providers.includes('dev')) return next();
     const pseudo = cleanName(req.query.nom) || 'Testeur';
-    logIn(req, res, { provider: 'dev', providerId: pseudo, pseudo, email: isEmail(req.query.email) ? req.query.email : null });
-    res.redirect(returnPath(req.query.retour));
+    await logIn(req, res, { provider: 'dev', providerId: pseudo, pseudo, email: isEmail(req.query.email) ? req.query.email : null });
+    res.redirect(await returnPath(req.query.retour));
   });
 
   router.get('/auth/:provider', async (req, res, next) => {
@@ -219,7 +219,7 @@ export function createAuth({ store, env = process.env, findRoomId = () => undefi
       config = await configuration(providerId);
     } catch (err) {
       console.error(`${PROVIDERS[providerId].label} injoignable :`, String(err.message).replaceAll(/[\r\n]/g, ' '));
-      return res.redirect(`/connexion?erreur=1&retour=${encodeURIComponent(returnPath(req.query.retour))}`);
+      return res.redirect(`/connexion?erreur=1&retour=${encodeURIComponent(await returnPath(req.query.retour))}`);
     }
     const state = oidc.randomState();
     const verifier = oidc.randomPKCECodeVerifier();
@@ -230,7 +230,7 @@ export function createAuth({ store, env = process.env, findRoomId = () => undefi
       code_challenge: await oidc.calculatePKCECodeChallenge(verifier),
       code_challenge_method: 'S256',
     });
-    const pending = { provider: providerId, state, verifier, retour: returnPath(req.query.retour), pseudo: cleanName(req.query.pseudo) };
+    const pending = { provider: providerId, state, verifier, retour: await returnPath(req.query.retour), pseudo: cleanName(req.query.pseudo) };
     res.cookie(OAUTH_COOKIE, Buffer.from(JSON.stringify(pending)).toString('base64url'), cookieOptions(req, OAUTH_MAX_AGE_MS, '/auth'));
     res.redirect(url.toString());
   });
@@ -245,7 +245,7 @@ export function createAuth({ store, env = process.env, findRoomId = () => undefi
       // cookie absent ou illisible : traité comme une tentative invalide
     }
     res.clearCookie(OAUTH_COOKIE, { path: '/auth' });
-    const retour = returnPath(pending?.retour);
+    const retour = await returnPath(pending?.retour);
     const failed = () => res.redirect(`/connexion?erreur=1&retour=${encodeURIComponent(retour)}`);
     if (pending?.provider !== providerId || typeof req.query.state !== 'string' || req.query.state !== pending.state || typeof pending.verifier !== 'string') {
       return failed();
@@ -259,7 +259,7 @@ export function createAuth({ store, env = process.env, findRoomId = () => undefi
       const tokens = await oidc.authorizationCodeGrant(config, currentUrl, { pkceCodeVerifier: pending.verifier, expectedState: pending.state });
       const profile = await provider.profile(tokens, fetchImpl);
       if (!profile.id) throw new Error('Identifiant manquant');
-      logIn(req, res, {
+      await logIn(req, res, {
         provider: providerId,
         providerId: profile.id,
         pseudo: cleanName(profile.pseudo) || cleanName(pending.pseudo),
@@ -274,14 +274,14 @@ export function createAuth({ store, env = process.env, findRoomId = () => undefi
     }
   });
 
-  router.post('/auth/deconnexion', (req, res) => {
-    store.deleteSession(parseCookies(req.headers.cookie)[SESSION_COOKIE]);
+  router.post('/auth/deconnexion', async (req, res) => {
+    await store.deleteSession(parseCookies(req.headers.cookie)[SESSION_COOKIE]);
     res.clearCookie(SESSION_COOKIE, { path: '/' });
     res.status(204).end();
   });
 
-  router.get('/api/compte', (req, res) => {
-    const user = currentUser(req);
+  router.get('/api/compte', async (req, res) => {
+    const user = await currentUser(req);
     res.set('cache-control', 'no-store');
     res.json({
       user: user && {
@@ -296,38 +296,38 @@ export function createAuth({ store, env = process.env, findRoomId = () => undefi
   });
 
   // Modification du pseudo, de l'email et de l'accord pour recevoir les résultats.
-  router.patch('/api/compte', requireUser, (req, res) => {
+  router.patch('/api/compte', requireUser, async (req, res) => {
     const { name, email = '', emailConsent = false } = req.body ?? {};
     const pseudo = cleanName(name);
     if (!pseudo) return res.status(400).json({ error: 'Choisissez un pseudo.' });
     const address = typeof email === 'string' ? email.trim() : '';
     if (address && !isEmail(address)) return res.status(400).json({ error: 'Cette adresse email ne semble pas valide.' });
     if (emailConsent === true && !address) return res.status(400).json({ error: 'Indiquez une adresse email pour recevoir les résultats.' });
-    store.updateUser(req.user.id, { name: pseudo, email: address || null, emailConsent: emailConsent === true });
+    await store.updateUser(req.user.id, { name: pseudo, email: address || null, emailConsent: emailConsent === true });
     res.json({ ok: true });
   });
 
-  router.delete('/api/compte', requireUser, (req, res) => {
-    store.deleteUser(req.user.id);
+  router.delete('/api/compte', requireUser, async (req, res) => {
+    await store.deleteUser(req.user.id);
     res.clearCookie(SESSION_COOKIE, { path: '/' });
     res.status(204).end();
   });
 
-  router.get('/api/compte/grilles', requireUser, (req, res) => {
+  router.get('/api/compte/grilles', requireUser, async (req, res) => {
     res.set('cache-control', 'no-store');
-    res.json(store.listUserGrids(req.user.id));
+    res.json(await store.listUserGrids(req.user.id));
   });
 
-  router.post('/api/compte/grilles', requireUser, (req, res) => {
+  router.post('/api/compte/grilles', requireUser, async (req, res) => {
     const { gridId, token } = req.body ?? {};
-    if (!store.claimGrid(req.user.id, gridId, token)) {
+    if (!(await store.claimGrid(req.user.id, gridId, token))) {
       return res.status(404).json({ error: 'Cette grille est introuvable, expirée ou déjà liée à un autre compte.' });
     }
     res.json({ ok: true });
   });
 
-  router.delete('/api/compte/grilles/:id', requireUser, (req, res) => {
-    store.forgetUserGrid(req.user.id, req.params.id);
+  router.delete('/api/compte/grilles/:id', requireUser, async (req, res) => {
+    await store.forgetUserGrid(req.user.id, req.params.id);
     res.status(204).end();
   });
 

@@ -4,9 +4,16 @@ services:
     name: co-loto
     runtime: node
     plan: free
+    # Francfort : au plus près des joueurs (la région d'un service ne peut plus changer ensuite).
+    region: frankfurt
     buildCommand: npm ci --omit=dev
     startCommand: npm start
     healthCheckPath: /
     envVars:
       - key: NODE_VERSION
         value: "22"
+      # Base Turso (voir le README) : valeurs à saisir dans Render, jamais dans le dépôt.
+      - key: TURSO_DATABASE_URL
+        sync: false
+      - key: TURSO_AUTH_TOKEN
+        sync: false

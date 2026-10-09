@@ -91,9 +91,9 @@ Tout est gratuit et open source :
 |---|---|
 | Serveur | [Node.js](https://nodejs.org/) 22.13 ou plus, [Express](https://expressjs.com/) |
 | Temps réel | [Socket.IO](https://socket.io/) (WebSocket) |
-| Base de données | SQLite, intégré à Node.js (`node:sqlite`), aucune installation |
+| Base de données | [Turso](https://turso.tech/) (SQLite hébergé, offre gratuite) en production, fichier SQLite local sinon, via le client officiel [@libsql/client](https://github.com/tursodatabase/libsql-client-ts) |
 | Interface | HTML, CSS et JavaScript sans framework ni étape de build, installable (PWA : manifeste et service worker) |
-| Connexion | [openid-client](https://github.com/panva/openid-client) (OAuth 2.0 et OpenID Connect, avec PKCE), sessions stockées dans SQLite |
+| Connexion | [openid-client](https://github.com/panva/openid-client) (OAuth 2.0 et OpenID Connect, avec PKCE), sessions stockées dans la base |
 | Tests | Lanceur de tests intégré à Node.js (`node --test`) |
 | Intégration continue | GitHub Actions |
 | Hébergement | [Render](https://render.com/), offre gratuite (fichier `render.yaml`) |
@@ -103,7 +103,7 @@ Organisation du code :
 ```
 src/game.js       Règles du jeu (sans réseau, entièrement testées)
 src/app.js        Serveur HTTP, API et événements temps réel
-src/store.js      Stockage des grilles terminées (SQLite, 30 jours), des comptes et des sessions
+src/store.js      Stockage des grilles terminées (30 jours), des comptes et des sessions (Turso ou fichier SQLite)
 src/auth.js       Connexion Google, Microsoft, GitHub, Discord, Facebook (OAuth 2.0 avec openid-client) et API « Mes grilles »
 src/drawDate.js   Validation de la date de tirage
 src/index.js      Point d'entrée
@@ -112,7 +112,7 @@ public/sw.js      Service worker (installation, copie des fichiers statiques)
 test/             Tests automatisés
 ```
 
-Les salons en cours vivent en mémoire du serveur ; seules les grilles terminées sont enregistrées dans SQLite.
+Les salons en cours vivent en mémoire du serveur ; seules les grilles terminées sont enregistrées dans la base.
 
 ## Installation et lancement
 
@@ -130,7 +130,8 @@ Variables d'environnement facultatives :
 | Variable | Rôle | Défaut |
 |---|---|---|
 | `PORT` | Port HTTP | `3000` |
-| `DATABASE_FILE` | Fichier SQLite des grilles | `data/co-loto.db` |
+| `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN` | Base Turso (URL `libsql://...` et jeton d'accès). Utilisée seulement si les deux sont définies | _(fichier local)_ |
+| `DATABASE_FILE` | Fichier SQLite local, utilisé sans Turso | `data/co-loto.db` |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Connexion avec Google | _(désactivée)_ |
 | `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET` | Connexion avec Microsoft | _(désactivée)_ |
 | `MICROSOFT_TENANT` | Annuaire Microsoft autorisé | `common` (comptes personnels et professionnels) |
@@ -168,7 +169,7 @@ Le fichier [`render.yaml`](render.yaml) du dépôt décrit déjà toute la confi
 
 1. Dans le tableau de bord Render, cliquez sur **New** puis **Blueprint**. Avec un compte tout neuf, Render ouvre d'abord l'assistant « Create a new Service », qui ne propose pas le Blueprint : cliquez sur **Skip** pour revenir au tableau de bord, où le bouton **New** est disponible.
 2. Choisissez le dépôt `MrTimber/Co-Loto` dans la liste (cliquez sur **Connect**).
-3. Donnez un nom au Blueprint (par exemple `co-loto`) et laissez la branche sur `main`. Render affiche le service web `co-loto` trouvé dans `render.yaml`, avec l'offre **Free**.
+3. Donnez un nom au Blueprint (par exemple `co-loto`) et laissez la branche sur `main`. Render affiche le service web `co-loto` trouvé dans `render.yaml`, avec l'offre **Free** et la région **Frankfurt**.
 4. Vérifiez la liste des ressources que Render va créer, puis cliquez sur **Deploy Blueprint**. Render installe les dépendances et démarre le site en quelques minutes.
 5. Ouvrez le service `co-loto` : son adresse publique s'affiche en haut de la page, sous la forme `https://co-loto-xxxx.onrender.com`. C'est l'adresse à partager.
 
@@ -186,6 +187,7 @@ Le fichier [`render.yaml`](render.yaml) du dépôt décrit déjà toute la confi
    | Root Directory | _(laisser vide)_ |
    | Build Command | `npm ci --omit=dev` |
    | Start Command | `npm start` |
+   | Region | **Frankfurt (EU Central)** |
    | Instance Type | **Free** |
 
 4. Dans **Environment Variables**, ajoutez `NODE_VERSION` avec la valeur `22` (Co-Loto a besoin de Node.js 22.13 ou plus).
@@ -238,6 +240,18 @@ Les aperçus de pull request ont une autre adresse : la connexion n'y fonctionne
 
 Co-Loto demande à chaque service l'accès à l'adresse email, pour pouvoir envoyer plus tard les résultats des grilles (uniquement avec l'accord du joueur, donné dans « Mes grilles »). Données conservées : le fournisseur, l'identifiant technique qu'il donne, l'adresse email et un pseudo (celui des parties, ou le pseudo GitHub ou Discord ; jamais les vrais nom et prénom). Le joueur modifie son pseudo et son email dans « Mes grilles », et peut y supprimer son compte. Le détail est sur la page `/confidentialite` du site.
 
+#### Base de données Turso (conserver les grilles)
+
+Le disque de l'offre gratuite de Render est effacé à chaque redéploiement ou mise en veille (voir plus bas). Pour que les grilles, les comptes et « Mes grilles » soient conservés, Co-Loto utilise une base [Turso](https://turso.tech/) gratuite (SQLite hébergé) dès que ses deux variables sont définies :
+
+1. Sur [app.turso.tech](https://app.turso.tech/), créez une base (**Create Database**), par exemple `co-loto`, dans la région la plus proche de celle du service Render : **Europe (Ireland)** pour un service à Francfort, comme celui décrit par `render.yaml`.
+2. Sur la page de la base, copiez son **URL** (de la forme `libsql://co-loto-xxxx.turso.io`), puis cliquez sur **Create Token** et copiez le jeton (lecture et écriture, sans date d'expiration ou avec une date lointaine).
+3. Dans Render, page du service > **Environment** > **Add Environment Variable** : ajoutez `TURSO_DATABASE_URL` avec l'URL et `TURSO_AUTH_TOKEN` avec le jeton, puis **Save Changes**. Render redéploie le site.
+
+Les tables sont créées au premier démarrage. Le journal du service indique alors « base Turso » au lancement. Le jeton donne accès à toute la base : ne le mettez jamais dans le code ni dans un message. S'il a fuité, révoquez-le dans Turso et créez-en un autre.
+
+Sans ces variables (en local, dans les tests), Co-Loto utilise le fichier `data/co-loto.db`.
+
 #### Mises à jour
 
 Chaque fusion dans `main` redéploie automatiquement le site (« Auto-Deploy », activé par défaut). Pour redéployer à la main : **Manual Deploy** puis **Deploy latest commit** sur la page du service.
@@ -245,16 +259,13 @@ Chaque fusion dans `main` redéploie automatiquement le site (« Auto-Deploy »,
 #### Limites de l'offre gratuite
 
 - **Mise en veille :** le service s'endort après 15 minutes sans visite. La visite suivante le réveille, mais le premier chargement prend alors environ une minute. Une partie en cours n'est pas concernée, puisque les joueurs restent connectés.
-- **Disque éphémère :** les fichiers ne sont pas conservés lors d'un redéploiement, d'un redémarrage ou d'une mise en veille. La base SQLite des grilles terminées est donc effacée à ces moments-là, et les liens `/grille/...` ne fonctionnent plus. Les comptes, les sessions et la liste « Mes grilles » sont effacés en même temps : il faut se reconnecter, et les grilles déjà jouées ne peuvent plus être retrouvées. Les salons en cours sont aussi perdus lors d'un redéploiement.
+- **Disque éphémère :** les fichiers ne sont pas conservés lors d'un redéploiement, d'un redémarrage ou d'une mise en veille. Sans base Turso, le fichier SQLite des grilles terminées est donc effacé à ces moments-là, et les liens `/grille/...` ne fonctionnent plus ; les comptes, les sessions et la liste « Mes grilles » aussi. Avec Turso (voir plus haut), tout cela est conservé. Les salons en cours restent perdus lors d'un redéploiement, puisqu'ils vivent en mémoire.
 - **Quota mensuel :** l'offre gratuite donne 750 heures d'exécution par mois et par espace de travail, de quoi faire tourner un service en continu.
-
-Pour garder les grilles 30 jours de façon fiable, une prochaine étape sera de brancher une base gratuite hébergée (par exemple [Turso](https://turso.tech/), compatible SQLite).
 
 ## Prochaines étapes
 
 - Récupération des résultats officiels du Loto après chaque tirage et calcul du rang de gain de chaque grille.
 - Adresse email facultative avec consentement, et envoi du résultat.
-- Base de données hébergée pour conserver les grilles malgré les redéploiements.
 
 ## Contribuer
 

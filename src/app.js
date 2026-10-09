@@ -110,8 +110,10 @@ export function createApp({
     }
   });
 
-  app.get('/api/grilles/:id', (req, res) => {
-    const grid = store.getGrid(req.params.id);
+  app.get('/api/grilles/:id', async (req, res) => {
+    // Grille tout juste terminée : on attend la fin de son enregistrement.
+    await rooms.get(req.params.id)?.saving;
+    const grid = await store.getGrid(req.params.id);
     if (!grid) return res.status(404).json({ error: "Cette grille n'existe pas ou a expiré (30 jours)." });
     res.json(grid);
   });
@@ -154,7 +156,7 @@ export function createApp({
       return;
     }
     if (game.status === 'finished' && !room.closeTimer) {
-      store.saveGrid({
+      room.saving = store.saveGrid({
         id: room.id,
         gameType: game.gameType,
         numbers: game.validated.numbers,
@@ -163,7 +165,7 @@ export function createApp({
         rounds: game.rounds.length,
         drawDate: game.drawDate,
         participants: [...room.tokens].map(([token, playerId]) => ({ token, name: findPlayer(game, playerId)?.name })).filter((p) => p.name),
-      });
+      }).catch((err) => console.error('Enregistrement de la grille impossible :', err.message));
       for (const timer of room.offlineTimers.values()) clearTimeout(timer);
       room.offlineTimers.clear();
       room.closeTimer = setTimeout(() => closeRoom(room), finishedRoomTtlMs);
@@ -263,7 +265,10 @@ export function createApp({
     socket.on('disconnect', () => detach(socket));
   });
 
-  const purgeTimer = setInterval(() => store.purgeExpired(), 6 * 60 * 60_000);
+  const purgeTimer = setInterval(
+    () => store.purgeExpired().catch((err) => console.error('Purge des grilles expirées impossible :', err.message)),
+    6 * 60 * 60_000,
+  );
   purgeTimer.unref();
   httpServer.on('close', () => {
     clearInterval(purgeTimer);
