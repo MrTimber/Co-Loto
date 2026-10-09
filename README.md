@@ -71,7 +71,7 @@ Le jeu est choisi à la création du salon :
 - [x] Page de consultation de la grille (30 jours, URL unique)
 - [x] Date de tirage optionnelle (limitée aux jours de tirage du jeu)
 - [x] Installable comme une application sur smartphone et tablette (PWA)
-- [x] Connexion facultative (Google, Microsoft, GitHub, Discord) et page « Mes grilles »
+- [x] Connexion facultative (Google, Microsoft, GitHub, Discord, Facebook) et page « Mes grilles »
 - [ ] Vérification des résultats officiels à la date du tirage
 - [ ] Envoi des résultats par email (avec consentement)
 
@@ -104,7 +104,7 @@ Organisation du code :
 src/game.js       Règles du jeu (sans réseau, entièrement testées)
 src/app.js        Serveur HTTP, API et événements temps réel
 src/store.js      Stockage des grilles terminées (SQLite, 30 jours), des comptes et des sessions
-src/auth.js       Connexion Google, Microsoft, GitHub, Discord (OAuth 2.0 avec openid-client) et API « Mes grilles »
+src/auth.js       Connexion Google, Microsoft, GitHub, Discord, Facebook (OAuth 2.0 avec openid-client) et API « Mes grilles »
 src/drawDate.js   Validation de la date de tirage
 src/index.js      Point d'entrée
 public/           Pages web (accueil, salon, grille, page hors ligne)
@@ -136,6 +136,7 @@ Variables d'environnement facultatives :
 | `MICROSOFT_TENANT` | Annuaire Microsoft autorisé | `common` (comptes personnels et professionnels) |
 | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | Connexion avec GitHub | _(désactivée)_ |
 | `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET` | Connexion avec Discord | _(désactivée)_ |
+| `FACEBOOK_CLIENT_ID`, `FACEBOOK_CLIENT_SECRET` | Connexion avec Facebook | _(désactivée)_ |
 | `PUBLIC_URL` | Adresse publique du site, pour les URL de rappel (inutile sur Render, qui fournit `RENDER_EXTERNAL_URL`) | adresse de la requête |
 | `AUTH_DEV_LOGIN` | `1` ajoute un « compte de test » sans fournisseur, pour le développement local (toujours ignoré sur Render) | _(désactivé)_ |
 
@@ -190,7 +191,7 @@ Le fichier [`render.yaml`](render.yaml) du dépôt décrit déjà toute la confi
 4. Dans **Environment Variables**, ajoutez `NODE_VERSION` avec la valeur `22` (Co-Loto a besoin de Node.js 22.13 ou plus).
 5. Cliquez sur **Deploy Web Service**, puis attendez que le journal affiche `Co-Loto est lancé`. L'adresse publique est en haut de la page du service.
 
-#### Connexion avec Google, Microsoft, GitHub et Discord
+#### Connexion avec Google, Microsoft, GitHub, Discord et Facebook
 
 La connexion est facultative et chaque fournisseur s'active séparément. Pour chacun, il faut créer une « application OAuth » dans la console du fournisseur, y déclarer l'**URL de rappel** ci-dessous, puis copier l'identifiant et le secret dans les variables d'environnement du service Render (**Environment** > **Add Environment Variable**, puis **Save Changes** : Render redéploie le site).
 
@@ -202,6 +203,7 @@ Remplacez `https://co-loto-xxxx.onrender.com` par l'adresse réelle du site (san
 | Microsoft | `https://co-loto-xxxx.onrender.com/auth/microsoft/callback` |
 | GitHub | `https://co-loto-xxxx.onrender.com/auth/github/callback` |
 | Discord | `https://co-loto-xxxx.onrender.com/auth/discord/callback` |
+| Facebook | `https://co-loto-xxxx.onrender.com/auth/facebook/callback` |
 
 Les aperçus de pull request ont une autre adresse : la connexion n'y fonctionne que si l'URL de rappel de l'aperçu est aussi déclarée (GitHub n'en accepte qu'une par application ; créez au besoin une seconde application de test).
 
@@ -226,6 +228,13 @@ Les aperçus de pull request ont une autre adresse : la connexion n'y fonctionne
 1. **New Application**, nom `Co-Loto`.
 2. Onglet **OAuth2** : copiez le **Client ID** dans `DISCORD_CLIENT_ID`, puis **Reset Secret** et copiez le secret dans `DISCORD_CLIENT_SECRET`.
 3. Dans **Redirects**, ajoutez l'URL de rappel et enregistrez.
+
+**Facebook** ([developers.facebook.com/apps](https://developers.facebook.com/apps), avec un compte Facebook)
+1. **Créer une app**, cas d'usage **Authentifier et demander des données aux utilisateurs avec Facebook Login**, puis nom `Co-Loto` et email de contact.
+2. **Cas d'usage** > **Personnaliser** : vérifiez que l'autorisation **email** est ajoutée (en plus de `public_profile`).
+3. **Facebook Login** > **Paramètres** : dans **URI de redirection OAuth valides**, ajoutez l'URL de rappel et enregistrez.
+4. **Paramètres de l'app** > **Général** : renseignez l'URL de la politique de confidentialité (`https://co-loto-xxxx.onrender.com/confidentialite`) et, pour la suppression des données, la même page (elle explique comment supprimer son compte depuis « Mes grilles »). Copiez l'**ID de l'app** dans `FACEBOOK_CLIENT_ID` et la **clé secrète** dans `FACEBOOK_CLIENT_SECRET`.
+5. Passez l'app du mode **Développement** au mode **Live** (en haut de la page) : sans cela, seuls les administrateurs de l'app peuvent se connecter. Les autorisations `email` et `public_profile` ne demandent pas d'examen par Meta.
 
 Co-Loto demande à chaque service l'accès à l'adresse email, pour pouvoir envoyer plus tard les résultats des grilles (uniquement avec l'accord du joueur, donné dans « Mes grilles »). Données conservées : le fournisseur, l'identifiant technique qu'il donne, l'adresse email et un pseudo (celui des parties, ou le pseudo GitHub ou Discord ; jamais les vrais nom et prénom). Le joueur modifie son pseudo et son email dans « Mes grilles », et peut y supprimer son compte. Le détail est sur la page `/confidentialite` du site.
 

@@ -2,7 +2,7 @@ import { getAccount, claimStoredGrids, providerButtons, el } from './account.js'
 import { rulesFor, formatDrawDate } from './common.js';
 
 const card = document.getElementById('my-grids');
-const PROVIDER_NAMES = { google: 'Google', microsoft: 'Microsoft', github: 'GitHub', discord: 'Discord', dev: 'le compte de test' };
+const PROVIDER_NAMES = { google: 'Google', microsoft: 'Microsoft', github: 'GitHub', discord: 'Discord', facebook: 'Facebook', dev: 'le compte de test' };
 const dateFormat = { day: 'numeric', month: 'long', year: 'numeric' };
 
 function balls(numbers, extra) {
@@ -80,7 +80,7 @@ function accountActions(user) {
     await fetch('/auth/deconnexion', { method: 'POST' });
     location.href = '/';
   });
-  const remove = el('button', 'link', 'Supprimer mon compte');
+  const remove = el('button', 'link danger', 'Supprimer mon compte');
   remove.type = 'button';
   remove.addEventListener('click', async () => {
     if (!confirm('Supprimer votre compte ? Les grilles restent consultables par leur lien, mais elles ne seront plus listées ici.')) return;
@@ -91,7 +91,8 @@ function accountActions(user) {
   privacy.href = '/confidentialite';
   return [
     el('p', 'small muted', `Connecté avec ${PROVIDER_NAMES[user.provider] ?? user.provider}. `, privacy),
-    el('div', 'actions', logout, remove),
+    el('div', 'actions', logout),
+    el('div', 'danger-zone', remove),
   ];
 }
 

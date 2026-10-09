@@ -61,8 +61,8 @@ test('fournisseurs activés selon les variables d’environnement', () => {
   assert.deepEqual(enabledProviders({}), []);
   assert.deepEqual(enabledProviders({ GITHUB_CLIENT_ID: 'a' }), []);
   assert.deepEqual(
-    enabledProviders({ DISCORD_CLIENT_ID: 'a', DISCORD_CLIENT_SECRET: 'b', GOOGLE_CLIENT_ID: 'c', GOOGLE_CLIENT_SECRET: 'd' }),
-    ['google', 'discord'],
+    enabledProviders({ FACEBOOK_CLIENT_ID: 'e', FACEBOOK_CLIENT_SECRET: 'f', DISCORD_CLIENT_ID: 'a', DISCORD_CLIENT_SECRET: 'b', GOOGLE_CLIENT_ID: 'c', GOOGLE_CLIENT_SECRET: 'd' }),
+    ['google', 'discord', 'facebook'],
   );
   assert.deepEqual(enabledProviders({ AUTH_DEV_LOGIN: '1' }), ['dev']);
   assert.deepEqual(enabledProviders({ AUTH_DEV_LOGIN: '1', RENDER: 'true' }), []);
@@ -87,6 +87,8 @@ const env = {
   AUTH_DEV_LOGIN: '1',
   GITHUB_CLIENT_ID: 'id-github',
   GITHUB_CLIENT_SECRET: 'secret-github',
+  FACEBOOK_CLIENT_ID: 'id-facebook',
+  FACEBOOK_CLIENT_SECRET: 'secret-facebook',
   PUBLIC_URL: 'https://co-loto.example',
 };
 
@@ -138,7 +140,7 @@ test('un joueur anonyme se connecte après la partie et retrouve la grille dans 
 
   const anonymous = await (await request('/api/compte')).json();
   assert.equal(anonymous.user, null);
-  assert.deepEqual(anonymous.providers.map((p) => p.id), ['github', 'dev']);
+  assert.deepEqual(anonymous.providers.map((p) => p.id), ['github', 'facebook', 'dev']);
   assert.equal((await request('/api/compte/grilles')).status, 401);
 
   const login = await request(`/auth/dev?nom=Alice&retour=${encodeURIComponent(`/grille/${roomId}`)}`);
@@ -244,4 +246,30 @@ test('après connexion, retour uniquement vers une page connue du site', async (
     const res = await request(`/auth/dev?retour=${encodeURIComponent(retour)}`);
     assert.equal(res.headers.get('location'), expected, retour);
   }
+});
+
+test('connexion Facebook : seul l’email est demandé, le pseudo vient des parties', async (t) => {
+  const start = await request('/auth/facebook?retour=/mes-grilles&pseudo=Lulu');
+  const location = new URL(start.headers.get('location'));
+  assert.equal(location.origin + location.pathname, 'https://www.facebook.com/v23.0/dialog/oauth');
+  assert.equal(location.searchParams.get('scope'), 'email');
+  const oauthCookie = start.headers.getSetCookie()[0].split(';')[0];
+
+  const realFetch = globalThis.fetch;
+  t.after(() => { globalThis.fetch = realFetch; });
+  let profileUrl;
+  globalThis.fetch = async (input, init) => {
+    const url = String(input instanceof Request ? input.url : input);
+    if (url === 'https://graph.facebook.com/v23.0/oauth/access_token') return Response.json({ access_token: 'jeton', token_type: 'bearer', expires_in: 3600 });
+    if (url.startsWith('https://graph.facebook.com/v23.0/me')) {
+      profileUrl = url;
+      return Response.json({ id: '987', email: 'lulu@example.com' });
+    }
+    return realFetch(input, init);
+  };
+  const callback = await request(`/auth/facebook/callback?code=abc&state=${location.searchParams.get('state')}`, { cookie: oauthCookie });
+  assert.equal(callback.headers.get('location'), '/mes-grilles');
+  assert.equal(new URL(profileUrl).searchParams.get('fields'), 'id,email');
+  const account = await (await request('/api/compte', { cookie: sessionCookie(callback) })).json();
+  assert.deepEqual(account.user, { name: 'Lulu', provider: 'facebook', email: 'lulu@example.com', emailVerified: true, emailConsent: false });
 });

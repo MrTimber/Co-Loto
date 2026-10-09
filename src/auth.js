@@ -1,4 +1,4 @@
-// Connexion avec un compte Google, Microsoft, GitHub ou Discord (OAuth 2.0 avec PKCE,
+// Connexion avec un compte Google, Microsoft, GitHub, Discord ou Facebook (OAuth 2.0 avec PKCE,
 // bibliothèque openid-client).
 // Chaque fournisseur n'est proposé que si ses identifiants sont définis dans l'environnement :
 // sans aucun, le site fonctionne comme avant, sans compte.
@@ -10,6 +10,7 @@ const OAUTH_COOKIE = 'coloto_oauth';
 const OAUTH_MAX_AGE_MS = 10 * 60_000;
 const NAME_MAX_LENGTH = 24; // comme le pseudo des parties
 const EMAIL_MAX_LENGTH = 254;
+const FACEBOOK_API_VERSION = 'v23.0';
 
 async function getJson(fetchImpl, url, accessToken) {
   const res = await fetchImpl(url, { headers: { authorization: `Bearer ${accessToken}`, 'user-agent': 'Co-Loto', accept: 'application/json' } });
@@ -73,6 +74,21 @@ export const PROVIDERS = {
     profile: async (tokens, fetchImpl) => {
       const user = await getJson(fetchImpl, 'https://discord.com/api/users/@me', tokens.access_token);
       return { id: String(user.id), pseudo: user.username, email: verifiedEmail(user.email, user.verified) };
+    },
+  },
+  facebook: {
+    label: 'Facebook',
+    envPrefix: 'FACEBOOK',
+    server: {
+      issuer: 'https://www.facebook.com',
+      authorization_endpoint: `https://www.facebook.com/${FACEBOOK_API_VERSION}/dialog/oauth`,
+      token_endpoint: `https://graph.facebook.com/${FACEBOOK_API_VERSION}/oauth/access_token`,
+    },
+    scopes: 'email',
+    profile: async (tokens, fetchImpl) => {
+      // Seuls l'identifiant et l'email sont demandés ; Facebook ne renvoie que des adresses confirmées.
+      const user = await getJson(fetchImpl, `https://graph.facebook.com/${FACEBOOK_API_VERSION}/me?fields=id,email`, tokens.access_token);
+      return { id: String(user.id), email: verifiedEmail(user.email, true) };
     },
   },
 };

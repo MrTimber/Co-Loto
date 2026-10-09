@@ -290,3 +290,5 @@ form label.game-option {
 .profile { border-top: 1px solid var(--border); padding-top: 1rem; margin-bottom: 1rem; }
 .profile label.inline { display: flex; gap: .5rem; align-items: flex-start; }
 .profile input[type=checkbox] { width: auto; margin-top: .3rem; flex: none; }
+.danger-zone { margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--border); text-align: center; }
+button.link.danger { color: var(--danger); }
