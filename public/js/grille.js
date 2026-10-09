@@ -31,11 +31,13 @@ try {
   if (!res.ok) throw new Error(body.error);
   const rules = rulesFor(body.gameType);
   applyTheme(rules.id);
+  const badge = document.getElementById('header-badge');
+  badge.textContent = rules.name;
+  badge.hidden = false;
   document.title = `Co-Loto · Votre grille ${rules.name}`;
   const created = new Date(body.createdAt).toLocaleDateString('fr-FR', dateFormat);
   const expires = new Date(body.expiresAt).toLocaleDateString('fr-FR', dateFormat);
   card.replaceChildren(
-    el('p', 'game-badge', rules.name),
     el('h1', '', `Votre grille ${rules.name}`),
     el('div', 'summary big', ...balls(body.numbers, 'validated'), ...balls(body.bonus, 'bonus')),
     el('p', '', 'Co-créée par ', ...listNames(body.players), ` en ${body.rounds} tours, le ${created}.`),
