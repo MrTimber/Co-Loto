@@ -121,6 +121,8 @@ $('leave-lobby').addEventListener('click', () => {
 function render() {
   if (!state?.me) return;
   applyTheme(state.gameType);
+  $('header-badge').textContent = rulesFor(state.gameType).name;
+  $('header-badge').hidden = false;
   if (state.status === 'lobby') renderLobby();
   else if (state.status === 'playing') renderGame();
   else if (state.status === 'finished') renderFinished();
@@ -279,7 +281,6 @@ function renderFinished() {
   show('finished');
   const rules = rulesFor(state.gameType);
   const [numbers, bonus] = rules.phases;
-  $('finished-badge').textContent = rules.name;
   $('finished-title').textContent = `Votre grille ${rules.name} est prête ! 🎉`;
   $('final-grid').innerHTML = gridBalls(state.validated[numbers.key], state.validated[bonus.key]);
   const url = `${location.origin}/grille/${encodeURIComponent(roomId)}`;

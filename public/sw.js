@@ -1,13 +1,14 @@
 // Service worker de Co-Loto : rend l'application installable et garde une copie
 // des fichiers statiques. Le jeu se déroule en temps réel : l'API et Socket.IO
 // passent toujours par le réseau, jamais par le cache.
-const CACHE = 'coloto-v1';
+const CACHE = 'coloto-v2';
 const OFFLINE_PAGE = '/hors-ligne.html';
 const PRECACHE = [
   OFFLINE_PAGE,
   '/style.css',
   '/icons/icon.svg',
   '/icons/icon-192.png',
+  '/img/logo.png',
 ];
 
 self.addEventListener('install', (event) => {

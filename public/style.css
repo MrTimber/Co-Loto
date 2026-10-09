@@ -69,13 +69,31 @@ h2 { font-size: 1.15rem; margin: 0 0 .75rem; }
 
 .site-header {
   display: flex;
-  justify-content: space-between;
+  gap: 1rem;
   align-items: center;
   padding: .75rem 1rem;
   border-bottom: 1px solid var(--border);
   background: var(--surface);
 }
-.logo { font-weight: 800; font-size: 1.3rem; text-decoration: none; color: var(--accent); }
+.logo { margin-right: auto; display: flex; }
+.logo img { display: block; height: 48px; width: auto; }
+
+/* Écran d'accueil (voir js/splash.js) */
+.splash {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 1.5rem;
+  background: #fff;
+  cursor: pointer;
+  transition: opacity .4s;
+}
+.splash img { width: 100%; max-width: 560px; height: auto; }
+.splash.hide { opacity: 0; }
+@media (prefers-reduced-motion: reduce) { .splash { transition: none; } }
+.site-header .game-badge { order: 1; margin: 0; }
 .site-footer { margin-top: auto; padding: 1.5rem 1rem; text-align: center; font-size: .85rem; color: var(--on-theme); opacity: .85; }
 .site-footer a { color: inherit; }
 
@@ -125,7 +143,8 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 
 .lobbies, .players { list-style: none; padding: 0; margin: 0 0 1rem; }
 .lobbies a { display: flex; justify-content: space-between; gap: 1rem; padding: .75rem; border: 1px solid var(--border); border-radius: 8px; margin-bottom: .5rem; text-decoration: none; color: var(--text); }
-.lobbies a span { color: var(--muted); }
+.lobbies a > span { color: var(--muted); }
+.lobbies .game-badge { margin: 0 .4rem 0 0; }
 .players li { padding: .4rem 0; border-bottom: 1px solid var(--border); }
 .players.compact { display: flex; flex-wrap: wrap; gap: .5rem 1rem; margin: .5rem 0 0; }
 .players.compact li { border: 0; padding: 0; }
@@ -280,6 +299,11 @@ form label.game-option {
   color: #fff;
   font-weight: 700;
   font-size: .85rem;
+}
+/* Centrage vertical optique : la boîte du texte est rognée à la hauteur des capitales,
+   sinon les métriques de la police (Segoe UI notamment) remontent le texte dans la pastille. */
+@supports (text-box: trim-both cap alphabetic) {
+  .game-badge { padding-block: .5rem; text-box: trim-both cap alphabetic; }
 }
 .banner .ball { width: 1.9rem; height: 1.9rem; font-size: .9rem; }
 

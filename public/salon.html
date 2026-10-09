@@ -16,9 +16,11 @@
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
+  <script src="/js/splash.js"></script>
   <header class="site-header">
-    <a class="logo" href="/">Co-Loto</a>
+    <a class="logo" href="/"><img src="/img/logo.png" alt="Co-Loto" width="80" height="48"></a>
     <span id="connection" class="connection muted"></span>
+    <span class="game-badge" id="header-badge" hidden></span>
   </header>
 
   <main class="container">
@@ -84,7 +86,6 @@
     </section>
 
     <section id="view-finished" class="card narrow" hidden>
-      <p class="game-badge" id="finished-badge"></p>
       <h1 id="finished-title">Votre grille est prête ! 🎉</h1>
       <div id="final-grid" class="summary big"></div>
       <p>Retrouvez-la pendant 30 jours à cette adresse :</p>
