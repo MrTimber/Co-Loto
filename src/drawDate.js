@@ -1,7 +1,5 @@
 // Date de tirage optionnelle : chaque jeu a ses jours de tirage.
-import { GAMES, DEFAULT_GAME } from './games.js';
-
-const MAX_DAYS_AHEAD = 365;
+import { GAMES, DEFAULT_GAME, MAX_DRAW_DAYS_AHEAD, todayInFrance } from './games.js';
 
 export function validateDrawDate(value, now = new Date(), gameType = DEFAULT_GAME) {
   if (value === undefined || value === null || value === '') return null;
@@ -16,9 +14,8 @@ export function validateDrawDate(value, now = new Date(), gameType = DEFAULT_GAM
   if (!game.drawWeekdays.includes(date.getUTCDay())) {
     throw new Error(`${game.theName} est tiré ${game.drawDays}.`);
   }
-  const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
-  const days = (date.getTime() - today) / 86_400_000;
+  const days = (date.getTime() - new Date(`${todayInFrance(now)}T00:00:00Z`).getTime()) / 86_400_000;
   if (days < 0) throw new Error('La date de tirage est déjà passée.');
-  if (days > MAX_DAYS_AHEAD) throw new Error("La date de tirage doit être dans moins d'un an.");
+  if (days > MAX_DRAW_DAYS_AHEAD) throw new Error("La date de tirage doit être dans moins d'un an.");
   return value;
 }

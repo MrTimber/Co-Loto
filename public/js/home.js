@@ -1,5 +1,5 @@
 import { saveToken, formatDrawDate, escapeHtml, rulesFor, applyTheme, describeGame } from './common.js';
-import { GAMES } from './games.js';
+import { GAMES, upcomingDrawDates } from './games.js';
 
 const form = document.getElementById('create-form');
 const errorBox = document.getElementById('create-error');
@@ -7,7 +7,27 @@ const select = form.elements.maxPlayers;
 
 for (let n = 2; n <= 12; n++) select.add(new Option(`${n} joueurs`, n, n === 3, n === 3));
 form.elements.name.value = localStorage.getItem('coloto:name') ?? '';
-form.elements.drawDate.min = new Date().toISOString().slice(0, 10);
+
+const monthFormat = new Intl.DateTimeFormat('fr-FR', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+
+// Seuls les jours de tirage du jeu sont proposés, groupés par mois. Une date déjà
+// choisie reste sélectionnée si le nouveau jeu est tiré ce jour-là, sinon elle est effacée.
+function fillDrawDates(rules) {
+  const drawSelect = form.elements.drawDate;
+  const previous = drawSelect.value;
+  drawSelect.replaceChildren(new Option('Pas encore décidé', ''));
+  let group = null;
+  for (const value of upcomingDrawDates(rules)) {
+    const date = new Date(`${value}T12:00:00Z`);
+    const month = monthFormat.format(date);
+    if (group?.label !== month) {
+      group = document.createElement('optgroup');
+      group.label = month;
+      drawSelect.append(group);
+    }
+    group.append(new Option(formatDrawDate(value), value, false, value === previous));
+  }
+}
 
 // Le choix du jeu change le fond de page, le principe affiché et les jours de tirage.
 function selectGame() {
@@ -15,6 +35,7 @@ function selectGame() {
   applyTheme(rules.id);
   document.getElementById('game-summary').textContent = `${describeGame(rules)[0].toUpperCase()}${describeGame(rules).slice(1)}`;
   document.getElementById('draw-days').textContent = `(optionnel : ${rules.theName} est tiré ${rules.drawDays})`;
+  fillDrawDates(rules);
 }
 form.elements.gameType.forEach((radio) => radio.addEventListener('change', selectGame));
 selectGame();
