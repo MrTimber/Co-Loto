@@ -300,6 +300,11 @@ form label.game-option {
   font-weight: 700;
   font-size: .85rem;
 }
+/* Centrage vertical optique : la boîte du texte est rognée à la hauteur des capitales,
+   sinon les métriques de la police (Segoe UI notamment) remontent le texte dans la pastille. */
+@supports (text-box: trim-both cap alphabetic) {
+  .game-badge { padding-block: .5rem; text-box: trim-both cap alphabetic; }
+}
 .banner .ball { width: 1.9rem; height: 1.9rem; font-size: .9rem; }
 
 /* Compte facultatif */
