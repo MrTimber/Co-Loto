@@ -18,8 +18,8 @@ function playRound(game, picks) {
 
 const throwsCode = (fn, code) => assert.throws(fn, (err) => err instanceof GameError && err.code === code);
 
-test('createGame valide le nombre de joueurs (2 à 12, 3 par défaut)', () => {
-  assert.equal(createGame().maxPlayers, 3);
+test('createGame valide le nombre de joueurs (2 à 12, 12 par défaut)', () => {
+  assert.equal(createGame().maxPlayers, 12);
   assert.equal(createGame({ maxPlayers: 12 }).maxPlayers, 12);
   throwsCode(() => createGame({ maxPlayers: 1 }), 'invalid_max_players');
   throwsCode(() => createGame({ maxPlayers: 13 }), 'invalid_max_players');

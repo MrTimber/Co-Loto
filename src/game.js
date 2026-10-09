@@ -7,7 +7,7 @@ export { GAMES, DEFAULT_GAME };
 
 export const MIN_PLAYERS = 2;
 export const MAX_PLAYERS_LIMIT = 12;
-export const DEFAULT_MAX_PLAYERS = 3;
+export const DEFAULT_MAX_PLAYERS = 12;
 export const MAX_NAME_LENGTH = 24;
 
 export class GameError extends Error {
