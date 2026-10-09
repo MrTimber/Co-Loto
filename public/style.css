@@ -164,25 +164,6 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .cell.validated:disabled { opacity: 1; cursor: default; }
 .game-grid.bonus .cell.validated { --cell-bg: var(--bonus); --cell-line: var(--bonus); --cell-text: var(--bonus-text); }
 
-/* Repère non coloré d'un numéro validé par tout le monde : une coche en pastille. */
-.cell .check {
-  display: none;
-  position: absolute;
-  z-index: 1;
-  top: -.2em;
-  right: -.2em;
-  width: 1.15em;
-  height: 1.15em;
-  border-radius: 50%;
-  background: var(--surface);
-  color: var(--text);
-  box-shadow: 0 0 0 1px var(--border);
-  font-size: .7rem;
-  line-height: 1.15em;
-  text-align: center;
-}
-.cell.validated .check { display: block; }
-
 /* Scintillement unique quand un numéro vient d'être validé (drop-shadow suit aussi les étoiles et les gouttes). */
 @keyframes validated-shine {
   0% { transform: scale(1); filter: drop-shadow(0 0 0 transparent); }
@@ -191,7 +172,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   100% { transform: scale(1); filter: drop-shadow(0 0 0 transparent); }
 }
 @media (prefers-reduced-motion: no-preference) {
-  .cell.just-validated { z-index: 2; animation: validated-shine .9s ease-out 2; }
+  .cell.just-validated { z-index: 2; animation: validated-shine .8s ease-out 2; }
 }
 
 .game-grid p { margin: 0 0 .35rem; }
@@ -206,7 +187,6 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .legend { display: flex; flex-wrap: wrap; gap: .25rem 1rem; list-style: none; padding: 0; margin: 0; }
 .legend li { display: flex; align-items: center; gap: .35rem; }
 .legend .cell { width: 1.1rem; font-size: .5rem; }
-.legend .cell .check { font-size: .45rem; }
 
 .summary { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: 1rem; }
 .summary.big { justify-content: center; margin: 1rem 0 1.5rem; }

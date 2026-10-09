@@ -50,9 +50,26 @@ socket.on('connect', () => {
 socket.on('disconnect', () => {
   $('connection').textContent = 'Connexion perdue, reconnexion…';
 });
+// À la fin d'un tour, son résultat reste affiché un instant avant de passer au tour suivant
+// (ou à la grille finale) : on voit ainsi l'animation du dernier numéro validé.
+const ROUND_END_PAUSE = 2000;
+let seenRound; // dernier tour terminé déjà connu (undefined tant qu'aucun état n'est reçu)
+let roundEndTimer = null;
+
 socket.on('room:state', (next) => {
   state = next;
-  render();
+  const ended = next.me ? (next.lastRound?.round ?? null) : undefined;
+  const isNewRoundEnd = seenRound !== undefined && ended !== null && ended !== seenRound;
+  if (ended !== undefined) seenRound = ended;
+  if (isNewRoundEnd) {
+    renderRoundEnd();
+    roundEndTimer = setTimeout(() => {
+      roundEndTimer = null;
+      render();
+    }, ROUND_END_PAUSE);
+  } else if (!roundEndTimer) {
+    render();
+  }
 });
 socket.on('room:closed', () => showMessage('Ce salon a été fermé.'));
 
@@ -158,13 +175,7 @@ function renderGame() {
   $('round-hint').textContent = waiting ? ` · en attente de ${waitingFor}` : '';
   $('game-players').innerHTML = playerList(state.players, { showPick: true });
 
-  const last = state.lastRound;
-  const hasNews = Boolean(last?.newlyValidated.length);
-  $('last-round').hidden = !hasNews;
-  if (hasNews) {
-    const ballClass = last.phase === rules.phases[0].key ? 'validated' : 'bonus';
-    $('last-round').innerHTML = `Tour ${last.round} : ${last.newlyValidated.map((n) => ball(n, ballClass)).join(' ')} validé${last.newlyValidated.length > 1 ? 's' : ''} par tout le monde !`;
-  }
+  $('last-round').hidden = true;
 
   const isBonus = phaseIndex > 0;
   $('grid-hint').textContent =
@@ -174,6 +185,33 @@ function renderGame() {
   $('collective-hint').textContent = collectiveHint(phase, isBonus, validated);
   $('collective-hint').hidden = !isBonus;
   renderGrid(phase, isBonus, validated);
+}
+
+function renderRoundEnd() {
+  applyTheme(state.gameType);
+  show('game');
+  const rules = rulesFor(state.gameType);
+  const last = state.lastRound;
+  const phaseIndex = rules.phases.findIndex((p) => p.key === last.phase);
+  const phase = rules.phases[phaseIndex];
+  const validated = state.validated[phase.key];
+  $('round-label').textContent = `${rules.name} · Fin du tour ${last.round} · ${capitalize(phase.many)} (${validated.length}/${phase.count})`;
+  $('round-hint').textContent = '';
+  $('game-players').innerHTML = playerList(state.players, { showPick: false });
+  $('last-round').innerHTML = roundResult(last.newlyValidated, phase, phaseIndex > 0);
+  $('last-round').hidden = false;
+  $('grid-hint').textContent = state.status === 'finished' ? 'Votre grille est complète !' : 'Le tour suivant commence dans un instant…';
+  $('collective-hint').hidden = true;
+  renderGrid(phase, phaseIndex > 0, validated);
+}
+
+function roundResult(numbers, phase, isBonus) {
+  if (numbers.length === 0) {
+    const none = phase.feminine ? 'Aucune' : 'Aucun';
+    return `Fin du tour : ${none} ${phase.one} validé${e(phase)} à ce tour.`;
+  }
+  const balls = numbers.map((n) => ball(n, isBonus ? 'bonus' : 'validated')).join(' ');
+  return `Fin du tour : ${balls} validé${e(phase)}${numbers.length > 1 ? 's' : ''} par tout le monde !`;
 }
 
 // Une seule grille réunit ses propres choix et les numéros validés par tout le monde.
@@ -217,11 +255,7 @@ function createCell(n) {
   cell.type = 'button';
   cell.className = 'cell';
   cell.dataset.number = n;
-  const check = document.createElement('span');
-  check.className = 'check';
-  check.setAttribute('aria-hidden', 'true');
-  check.textContent = '✓';
-  cell.append(String(n), check);
+  cell.textContent = n;
   cell.addEventListener('animationend', () => cell.classList.remove('just-validated'));
   return cell;
 }
@@ -283,7 +317,7 @@ if (navigator.share) {
 
 $('grid').addEventListener('click', (event) => {
   const cell = event.target.closest('button[data-number]');
-  if (!cell || cell.disabled) return;
+  if (!cell || cell.disabled || roundEndTimer) return;
   act('game:pick', { number: Number(cell.dataset.number) }, 'game-error');
 });
 
