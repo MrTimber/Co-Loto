@@ -1,5 +1,6 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { io as connect } from 'socket.io-client';
 import { createApp } from '../src/app.js';
 import { openStore, GRID_LIFETIME_MS } from '../src/store.js';
@@ -189,6 +190,8 @@ test('connexion GitHub : redirection, contrôle de l’état et création du com
   assert.equal(location.searchParams.get('client_id'), 'id-github');
   assert.equal(location.searchParams.get('redirect_uri'), 'https://co-loto.example/auth/github/callback');
   assert.equal(location.searchParams.get('scope'), 'user:email');
+  assert.equal(location.searchParams.get('code_challenge_method'), 'S256');
+  const challenge = location.searchParams.get('code_challenge');
   const state = location.searchParams.get('state');
   const oauthCookie = start.headers.getSetCookie()[0].split(';')[0];
 
@@ -197,11 +200,15 @@ test('connexion GitHub : redirection, contrôle de l’état et création du com
   assert.equal(forged.headers.get('location'), '/connexion?erreur=1&retour=%2Fmes-grilles');
   assert.equal(sessionCookie(forged), undefined);
 
+  let tokenRequest;
   const realFetch = globalThis.fetch;
   t.after(() => { globalThis.fetch = realFetch; });
   globalThis.fetch = async (input, init) => {
     const url = String(input instanceof Request ? input.url : input);
-    if (url === 'https://github.com/login/oauth/access_token') return Response.json({ access_token: 'jeton', token_type: 'bearer' });
+    if (url === 'https://github.com/login/oauth/access_token') {
+      tokenRequest = new URLSearchParams(String(init.body));
+      return Response.json({ access_token: 'jeton', token_type: 'bearer' });
+    }
     if (url === 'https://api.github.com/user') return Response.json({ id: 1234, login: 'octocat', name: 'Vrai Nom' });
     if (url === 'https://api.github.com/user/emails') {
       return Response.json([{ email: 'secondaire@example.com', primary: false, verified: true }, { email: 'octo@example.com', primary: true, verified: true }]);
@@ -210,6 +217,10 @@ test('connexion GitHub : redirection, contrôle de l’état et création du com
   };
   const callback = await request(`/auth/github/callback?code=abc&state=${state}`, { cookie: oauthCookie });
   assert.equal(callback.headers.get('location'), '/mes-grilles');
+  // Le code est échangé avec le vérificateur PKCE correspondant et la même adresse de rappel.
+  assert.equal(tokenRequest.get('code'), 'abc');
+  assert.equal(tokenRequest.get('redirect_uri'), 'https://co-loto.example/auth/github/callback');
+  assert.equal(createHash('sha256').update(tokenRequest.get('code_verifier')).digest('base64url'), challenge);
   const cookie = sessionCookie(callback);
   const account = await (await request('/api/compte', { cookie })).json();
   // Le pseudo GitHub est repris, jamais le vrai nom ; l'email principal vérifié est gardé.

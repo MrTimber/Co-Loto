@@ -93,7 +93,7 @@ Tout est gratuit et open source :
 | Temps réel | [Socket.IO](https://socket.io/) (WebSocket) |
 | Base de données | SQLite, intégré à Node.js (`node:sqlite`), aucune installation |
 | Interface | HTML, CSS et JavaScript sans framework ni étape de build, installable (PWA : manifeste et service worker) |
-| Connexion | [Arctic](https://arcticjs.dev/) (OAuth 2.0), sessions stockées dans SQLite |
+| Connexion | [openid-client](https://github.com/panva/openid-client) (OAuth 2.0 et OpenID Connect, avec PKCE), sessions stockées dans SQLite |
 | Tests | Lanceur de tests intégré à Node.js (`node --test`) |
 | Intégration continue | GitHub Actions |
 | Hébergement | [Render](https://render.com/), offre gratuite (fichier `render.yaml`) |
@@ -104,7 +104,7 @@ Organisation du code :
 src/game.js       Règles du jeu (sans réseau, entièrement testées)
 src/app.js        Serveur HTTP, API et événements temps réel
 src/store.js      Stockage des grilles terminées (SQLite, 30 jours), des comptes et des sessions
-src/auth.js       Connexion Google, Microsoft, GitHub, Discord (OAuth 2.0 avec Arctic) et API « Mes grilles »
+src/auth.js       Connexion Google, Microsoft, GitHub, Discord (OAuth 2.0 avec openid-client) et API « Mes grilles »
 src/drawDate.js   Validation de la date de tirage
 src/index.js      Point d'entrée
 public/           Pages web (accueil, salon, grille, page hors ligne)

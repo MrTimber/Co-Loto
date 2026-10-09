@@ -1,8 +1,9 @@
-// Connexion avec un compte Google, Microsoft, GitHub ou Discord (OAuth 2.0, bibliothèque Arctic).
+// Connexion avec un compte Google, Microsoft, GitHub ou Discord (OAuth 2.0 avec PKCE,
+// bibliothèque openid-client).
 // Chaque fournisseur n'est proposé que si ses identifiants sont définis dans l'environnement :
 // sans aucun, le site fonctionne comme avant, sans compte.
 import express from 'express';
-import { Google, MicrosoftEntraId, GitHub, Discord, generateState, generateCodeVerifier, decodeIdToken } from 'arctic';
+import * as oidc from 'openid-client';
 
 const SESSION_COOKIE = 'coloto_session';
 const OAUTH_COOKIE = 'coloto_oauth';
@@ -19,41 +20,43 @@ async function getJson(fetchImpl, url, accessToken) {
 // Adresse email vérifiée renvoyée par le fournisseur, sinon null.
 const verifiedEmail = (email, verified) => (verified && typeof email === 'string' ? email : null);
 
-// `pkce` : le fournisseur attend un code_verifier. `profile` renvoie l'identifiant, l'email
-// et, quand le fournisseur en a un, un pseudo (jamais le vrai nom ni le prénom).
+// `server` : adresse de découverte OpenID Connect, ou points d'accès OAuth 2.0 déclarés à la main.
+// `profile` renvoie l'identifiant, l'email et, quand le fournisseur en a un, un pseudo
+// (jamais le vrai nom ni le prénom).
 export const PROVIDERS = {
   google: {
     label: 'Google',
     envPrefix: 'GOOGLE',
-    pkce: true,
-    scopes: ['openid', 'email'],
-    client: (id, secret, callback) => new Google(id, secret, callback),
+    server: { discovery: 'https://accounts.google.com' },
+    scopes: 'openid email',
     profile: async (tokens) => {
-      const claims = decodeIdToken(tokens.idToken());
+      const claims = tokens.claims();
       return { id: claims.sub, email: verifiedEmail(claims.email, claims.email_verified) };
     },
   },
   microsoft: {
     label: 'Microsoft',
     envPrefix: 'MICROSOFT',
-    pkce: true,
-    scopes: ['openid', 'email'],
-    client: (id, secret, callback, env) => new MicrosoftEntraId(env.MICROSOFT_TENANT || 'common', id, secret, callback),
+    server: { discovery: (env) => `https://login.microsoftonline.com/${env.MICROSOFT_TENANT || 'common'}/v2.0` },
+    scopes: 'openid email',
     profile: async (tokens) => {
       // Microsoft ne garantit pas que l'adresse a été vérifiée : elle est gardée comme non vérifiée.
-      const claims = decodeIdToken(tokens.idToken());
+      const claims = tokens.claims();
       return { id: claims.sub, email: typeof claims.email === 'string' ? claims.email : null, emailVerified: false };
     },
   },
   github: {
     label: 'GitHub',
     envPrefix: 'GITHUB',
-    pkce: false,
-    scopes: ['user:email'],
-    client: (id, secret, callback) => new GitHub(id, secret, callback),
+    server: {
+      issuer: 'https://github.com',
+      authorization_endpoint: 'https://github.com/login/oauth/authorize',
+      token_endpoint: 'https://github.com/login/oauth/access_token',
+    },
+    scopes: 'user:email',
     profile: async (tokens, fetchImpl) => {
-      const user = await getJson(fetchImpl, 'https://api.github.com/user', tokens.accessToken());
-      const emails = await getJson(fetchImpl, 'https://api.github.com/user/emails', tokens.accessToken());
+      const user = await getJson(fetchImpl, 'https://api.github.com/user', tokens.access_token);
+      const emails = await getJson(fetchImpl, 'https://api.github.com/user/emails', tokens.access_token);
       const primary = Array.isArray(emails) ? emails.find((e) => e.primary) : null;
       return { id: String(user.id), pseudo: user.login, email: verifiedEmail(primary?.email, primary?.verified) };
     },
@@ -61,11 +64,14 @@ export const PROVIDERS = {
   discord: {
     label: 'Discord',
     envPrefix: 'DISCORD',
-    pkce: true,
-    scopes: ['identify', 'email'],
-    client: (id, secret, callback) => new Discord(id, secret, callback),
+    server: {
+      issuer: 'https://discord.com',
+      authorization_endpoint: 'https://discord.com/oauth2/authorize',
+      token_endpoint: 'https://discord.com/api/oauth2/token',
+    },
+    scopes: 'identify email',
     profile: async (tokens, fetchImpl) => {
-      const user = await getJson(fetchImpl, 'https://discord.com/api/users/@me', tokens.accessToken());
+      const user = await getJson(fetchImpl, 'https://discord.com/api/users/@me', tokens.access_token);
       return { id: String(user.id), pseudo: user.username, email: verifiedEmail(user.email, user.verified) };
     },
   },
@@ -143,10 +149,25 @@ export function createAuth({ store, env = process.env, findRoomId = () => undefi
     return url;
   }
 
-  function oauthClient(req, providerId) {
-    const provider = PROVIDERS[providerId];
-    const callback = `${baseUrl(req)}/auth/${providerId}/callback`;
-    return provider.client(env[`${provider.envPrefix}_CLIENT_ID`], env[`${provider.envPrefix}_CLIENT_SECRET`], callback, env);
+  const callbackUrl = (req, providerId) => `${baseUrl(req)}/auth/${providerId}/callback`;
+
+  // Configuration de chaque fournisseur, préparée une seule fois (la découverte OpenID Connect
+  // interroge le fournisseur ; en cas d'échec, elle sera retentée à la connexion suivante).
+  const configurations = new Map();
+  function configuration(providerId) {
+    if (!configurations.has(providerId)) {
+      const { envPrefix, server } = PROVIDERS[providerId];
+      const clientId = env[`${envPrefix}_CLIENT_ID`];
+      const secret = env[`${envPrefix}_CLIENT_SECRET`];
+      const ready = server.discovery
+        ? oidc.discovery(new URL(typeof server.discovery === 'function' ? server.discovery(env) : server.discovery), clientId, secret)
+        : Promise.resolve(new oidc.Configuration(server, clientId, secret));
+      configurations.set(providerId, ready.catch((err) => {
+        configurations.delete(providerId);
+        throw err;
+      }));
+    }
+    return configurations.get(providerId);
   }
 
   function currentUser(req) {
@@ -174,14 +195,25 @@ export function createAuth({ store, env = process.env, findRoomId = () => undefi
     res.redirect(returnPath(req.query.retour));
   });
 
-  router.get('/auth/:provider', (req, res, next) => {
+  router.get('/auth/:provider', async (req, res, next) => {
     const providerId = req.params.provider;
     if (!providers.includes(providerId) || providerId === 'dev') return next();
-    const { pkce, scopes } = PROVIDERS[providerId];
-    const state = generateState();
-    const verifier = pkce ? generateCodeVerifier() : null;
-    const client = oauthClient(req, providerId);
-    const url = pkce ? client.createAuthorizationURL(state, verifier, scopes) : client.createAuthorizationURL(state, scopes);
+    let config;
+    try {
+      config = await configuration(providerId);
+    } catch (err) {
+      console.error(`${PROVIDERS[providerId].label} injoignable :`, String(err.message).replaceAll(/[\r\n]/g, ' '));
+      return res.redirect(`/connexion?erreur=1&retour=${encodeURIComponent(returnPath(req.query.retour))}`);
+    }
+    const state = oidc.randomState();
+    const verifier = oidc.randomPKCECodeVerifier();
+    const url = oidc.buildAuthorizationUrl(config, {
+      redirect_uri: callbackUrl(req, providerId),
+      scope: PROVIDERS[providerId].scopes,
+      state,
+      code_challenge: await oidc.calculatePKCECodeChallenge(verifier),
+      code_challenge_method: 'S256',
+    });
     const pending = { provider: providerId, state, verifier, retour: returnPath(req.query.retour), pseudo: cleanName(req.query.pseudo) };
     res.cookie(OAUTH_COOKIE, Buffer.from(JSON.stringify(pending)).toString('base64url'), cookieOptions(req, OAUTH_MAX_AGE_MS, '/auth'));
     res.redirect(url.toString());
@@ -199,15 +231,16 @@ export function createAuth({ store, env = process.env, findRoomId = () => undefi
     res.clearCookie(OAUTH_COOKIE, { path: '/auth' });
     const retour = returnPath(pending?.retour);
     const failed = () => res.redirect(`/connexion?erreur=1&retour=${encodeURIComponent(retour)}`);
-    if (pending?.provider !== providerId || typeof req.query.state !== 'string' || req.query.state !== pending.state || typeof req.query.code !== 'string') {
+    if (pending?.provider !== providerId || typeof req.query.state !== 'string' || req.query.state !== pending.state || typeof pending.verifier !== 'string') {
       return failed();
     }
     try {
       const provider = PROVIDERS[providerId];
-      const client = oauthClient(req, providerId);
-      const tokens = provider.pkce
-        ? await client.validateAuthorizationCode(req.query.code, pending.verifier)
-        : await client.validateAuthorizationCode(req.query.code);
+      const config = await configuration(providerId);
+      // Adresse de rappel reconstruite avec l'adresse publique (le site est derrière un proxy HTTPS).
+      const currentUrl = new URL(callbackUrl(req, providerId));
+      currentUrl.search = new URL(req.originalUrl, 'http://localhost').search;
+      const tokens = await oidc.authorizationCodeGrant(config, currentUrl, { pkceCodeVerifier: pending.verifier, expectedState: pending.state });
       const profile = await provider.profile(tokens, fetchImpl);
       if (!profile.id) throw new Error('Identifiant manquant');
       logIn(req, res, {
