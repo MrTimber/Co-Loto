@@ -121,8 +121,6 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 
 .grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: .35rem; }
 .grid.chance { grid-template-columns: repeat(5, 1fr); }
-#collective-chance { grid-template-columns: repeat(10, 1fr); gap: .25rem; }
-.grid-label { margin: 1rem 0 .4rem; font-size: .875rem; font-weight: 600; color: var(--muted); }
 .cell {
   display: flex;
   align-items: center;
@@ -130,7 +128,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   aspect-ratio: 1;
   padding: 0;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 50%;
   background: var(--surface);
   color: var(--text);
   font-weight: 600;
@@ -158,6 +156,4 @@ button.cell:hover:not(:disabled) { border-color: var(--accent); }
 }
 .summary.big .ball { width: 3.2rem; height: 3.2rem; font-size: 1.3rem; }
 .ball.chance { background: var(--chance); }
-.ball.empty { background: transparent; border: 2px dashed var(--border); color: var(--muted); }
-.ball.chance-empty { border-color: var(--chance-soft); }
 .banner .ball { width: 1.9rem; height: 1.9rem; font-size: .9rem; }
