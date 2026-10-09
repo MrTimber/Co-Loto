@@ -25,8 +25,10 @@ export function providerButtons(providers, retour = currentPath()) {
   return el('div', 'providers', ...providers.map((p) => {
     const link = el('a', `button provider provider-${p.id}`, `Continuer avec ${p.label}`);
     // Le pseudo déjà utilisé dans les parties sert de pseudo au nouveau compte.
+    const params = new URLSearchParams({ retour });
     const pseudo = localStorage.getItem('coloto:name');
-    link.href = `/auth/${p.id}?retour=${encodeURIComponent(retour)}${pseudo ? `&pseudo=${encodeURIComponent(pseudo)}` : ''}`;
+    if (pseudo) params.set('pseudo', pseudo);
+    link.href = `/auth/${p.id}?${params}`;
     return link;
   }));
 }
