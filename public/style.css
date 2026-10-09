@@ -134,7 +134,20 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .pick-status { font-size: .85rem; color: var(--muted); }
 .pick-status.done { color: var(--accent); font-weight: 600; }
 
-.game-status { margin-bottom: 1rem; }
+.game-status { position: relative; margin-bottom: 1rem; }
+/* Le message de fin de tour remplace le contenu du cadre du tour sans changer sa hauteur : la grille ne bouge pas. */
+.game-status .banner {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  margin: 0;
+  border-radius: inherit;
+  font-size: 1.1rem;
+  font-weight: 600;
+  text-align: center;
+}
+#view-game:has(#last-round:not([hidden])) :is(.game-status > :not(.banner), .game-grid > p) { visibility: hidden; }
 .banner { background: var(--accent-soft); border-radius: var(--radius); padding: .75rem 1rem; margin: 0 0 1rem; }
 
 .grid { display: grid; grid-template-columns: repeat(var(--columns, 7), 1fr); gap: .35rem; }
@@ -183,7 +196,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 @media (max-width: 480px) {
   .container:has(#view-game:not([hidden])) { padding: .75rem; }
   #view-game .card { padding: .9rem; }
-  #view-game :is(.game-status, .banner) { margin-bottom: .6rem; }
+  #view-game .game-status { margin-bottom: .6rem; }
 }
 .legend { display: flex; flex-wrap: wrap; gap: .25rem 1rem; list-style: none; padding: 0; margin: 0; }
 .legend li { display: flex; align-items: center; gap: .35rem; }

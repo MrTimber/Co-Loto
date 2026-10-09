@@ -196,13 +196,9 @@ function renderRoundEnd() {
   const phaseIndex = rules.phases.findIndex((p) => p.key === last.phase);
   const phase = rules.phases[phaseIndex];
   const validated = state.validated[phase.key];
-  $('round-label').textContent = `${rules.name} · Fin du tour ${last.round} · ${capitalize(phase.many)} (${validated.length}/${phase.count})`;
-  $('round-hint').textContent = '';
-  $('game-players').innerHTML = playerList(state.players, { showPick: false });
-  $('last-round').innerHTML = roundResult(last.newlyValidated, phase, phaseIndex > 0);
+  // Le cadre du tour et les consignes gardent leur contenu (masqué) pour que rien ne bouge à l'écran.
+  $('last-round').innerHTML = `<span>${roundResult(last.newlyValidated, phase, phaseIndex > 0)}</span>`;
   $('last-round').hidden = false;
-  $('grid-hint').textContent = state.status === 'finished' ? 'Votre grille est complète !' : 'Le tour suivant commence dans un instant…';
-  $('collective-hint').hidden = true;
   renderGrid(phase, phaseIndex > 0, validated);
 }
 
