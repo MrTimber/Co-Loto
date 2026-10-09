@@ -1,5 +1,6 @@
 import { formatDrawDate, rulesFor, applyTheme } from './common.js';
 import { renderGridAccountOffer } from './account.js';
+import { renderPlayOptions } from './play-options.js';
 
 const id = decodeURIComponent(location.pathname.split('/').pop());
 const card = document.getElementById('grid-card');
@@ -37,9 +38,12 @@ try {
   document.title = `Co-Loto · Votre grille ${rules.name}`;
   const created = new Date(body.createdAt).toLocaleDateString('fr-FR', dateFormat);
   const expires = new Date(body.expiresAt).toLocaleDateString('fr-FR', dateFormat);
+  const [numbers, bonus] = rules.phases;
+  const options = el('div', 'play-options');
+  const overflow = renderPlayOptions(options, rules, { [numbers.key]: body.numbers, [bonus.key]: body.bonus });
   card.replaceChildren(
     el('h1', '', `Votre grille ${rules.name}`),
-    el('div', 'summary big', ...balls(body.numbers, 'validated'), ...balls(body.bonus, 'bonus')),
+    overflow ? options : el('div', 'summary big', ...balls(body.numbers, 'validated'), ...balls(body.bonus, 'bonus')),
     el('p', '', 'Co-créée par ', ...listNames(body.players), ` en ${body.rounds} tours, le ${created}.`),
   );
   if (body.drawDate) {

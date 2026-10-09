@@ -56,7 +56,6 @@ export function createApp({
   offlineGraceMs = 90_000,
   finishedRoomTtlMs = 10 * 60_000,
   maxRooms = 1000,
-  rng = Math.random,
   env = process.env,
 } = {}) {
   const rooms = new Map();
@@ -145,7 +144,7 @@ export function createApp({
     for (const [token, id] of room.tokens) if (id === playerId) room.tokens.delete(token);
     clearTimeout(room.offlineTimers.get(playerId));
     room.offlineTimers.delete(playerId);
-    removePlayer(room.game, playerId, rng);
+    removePlayer(room.game, playerId);
     afterChange(room);
   }
 
@@ -241,7 +240,7 @@ export function createApp({
     socket.on('game:pick', (payload, ack) =>
       handle(ack, () => {
         const room = currentRoom(socket);
-        pick(room.game, socket.data.playerId, payload?.number, rng);
+        pick(room.game, socket.data.playerId, payload?.number);
         afterChange(room);
       }),
     );
