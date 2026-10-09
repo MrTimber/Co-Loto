@@ -81,7 +81,7 @@ h2 { font-size: 1.15rem; margin: 0 0 .75rem; }
 
 .container { width: 100%; max-width: 1100px; margin: 0 auto; padding: 1.5rem 1rem; }
 .intro { max-width: 680px; margin-bottom: 1.5rem; color: var(--on-theme); }
-.columns, .grids { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+.columns { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
 .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem; }
 .narrow { max-width: 560px; margin: 0 auto; }
 .center { text-align: center; }
@@ -143,6 +143,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   --cell-line: var(--border);
   --cell-line-width: 1px;
   --cell-text: var(--text);
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -155,11 +156,38 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   font-weight: 600;
   font-size: .95rem;
 }
-button.cell:hover:not(:disabled) { --cell-line: var(--accent); }
-.cell.picked { --cell-bg: var(--picked); --cell-text: var(--muted); opacity: 1; cursor: default; text-decoration: line-through; }
+@media (hover: hover) {
+  button.cell:hover:not(:disabled, .pending) { --cell-line: var(--accent); }
+}
+.cell.picked { --cell-bg: var(--picked); --cell-text: var(--muted); opacity: 1; cursor: default; }
 .cell.pending { --cell-bg: var(--pending-soft); --cell-line: var(--pending); --cell-line-width: 2px; }
 .cell.validated { --cell-bg: var(--accent); --cell-line: var(--accent); --cell-text: var(--accent-text); text-decoration: none; }
-.cell.bonus-validated, #personal-grid.bonus .cell.validated { --cell-bg: var(--bonus); --cell-line: var(--bonus); --cell-text: var(--bonus-text); }
+.cell.validated:disabled { opacity: 1; cursor: default; }
+.game-grid.bonus .cell.validated { --cell-bg: var(--bonus); --cell-line: var(--bonus); --cell-text: var(--bonus-text); }
+
+/* Scintillement unique quand un numéro vient d'être validé (drop-shadow suit aussi les étoiles et les gouttes). */
+@keyframes validated-shine {
+  0% { transform: scale(1); filter: drop-shadow(0 0 0 transparent); }
+  35% { transform: scale(1.22); filter: drop-shadow(0 0 .45rem var(--pending)); }
+  70% { transform: scale(.96); filter: drop-shadow(0 0 .25rem var(--pending)); }
+  100% { transform: scale(1); filter: drop-shadow(0 0 0 transparent); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .cell.just-validated { z-index: 2; animation: validated-shine .8s ease-out 2; }
+}
+
+.game-grid p { margin: 0 0 .35rem; }
+.game-grid .grid { margin: .6rem 0 .75rem; }
+#game-error:empty { display: none; }
+#view-game { max-width: 600px; margin: 0 auto; }
+@media (max-width: 480px) {
+  .container:has(#view-game:not([hidden])) { padding: .75rem; }
+  #view-game .card { padding: .9rem; }
+  #view-game :is(.game-status, .banner) { margin-bottom: .6rem; }
+}
+.legend { display: flex; flex-wrap: wrap; gap: .25rem 1rem; list-style: none; padding: 0; margin: 0; }
+.legend li { display: flex; align-items: center; gap: .35rem; }
+.legend .cell { width: 1.1rem; font-size: .5rem; }
 
 .summary { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: 1rem; }
 .summary.big { justify-content: center; margin: 1rem 0 1.5rem; }
@@ -208,10 +236,10 @@ button.cell:hover:not(:disabled) { --cell-line: var(--accent); }
   transform: translateY(-10%) rotate(45deg);
 }
 [data-game=eurodreams] .grid.bonus .cell:not(.picked) { --cell-text: var(--bonus); }
-[data-game=eurodreams] .grid.bonus .cell:is(.validated, .bonus-validated) { --cell-text: var(--bonus-text); }
+[data-game=eurodreams] .grid.bonus .cell.validated { --cell-text: var(--bonus-text); }
 @media (prefers-color-scheme: dark) {
   [data-game=eurodreams] .grid.bonus .cell:not(.picked) { --cell-text: #f472b6; }
-  [data-game=eurodreams] .grid.bonus .cell:is(.validated, .bonus-validated) { --cell-text: var(--bonus-text); }
+  [data-game=eurodreams] .grid.bonus .cell.validated { --cell-text: var(--bonus-text); }
 }
 
 .game-picker { display: grid; grid-template-columns: repeat(3, 1fr); gap: .5rem; }
