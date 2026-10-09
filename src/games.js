@@ -50,3 +50,21 @@ export function getGame(id) {
 export function findPhase(game, key) {
   return game.phases.find((p) => p.key === key) ?? null;
 }
+
+// Les tirages ont lieu en France : « aujourd'hui » s'entend à l'heure de Paris.
+export const MAX_DRAW_DAYS_AHEAD = 365;
+
+export function todayInFrance(now = new Date()) {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(now);
+}
+
+// Les dates de tirage du jeu (AAAA-MM-JJ), d'aujourd'hui à dans un an.
+export function upcomingDrawDates(game, now = new Date()) {
+  const start = new Date(`${todayInFrance(now)}T00:00:00Z`);
+  const dates = [];
+  for (let day = 0; day <= MAX_DRAW_DAYS_AHEAD; day++) {
+    const date = new Date(start.getTime() + day * 86_400_000);
+    if (game.drawWeekdays.includes(date.getUTCDay())) dates.push(date.toISOString().slice(0, 10));
+  }
+  return dates;
+}
