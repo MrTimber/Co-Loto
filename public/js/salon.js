@@ -217,6 +217,7 @@ function renderFinished() {
   show('finished');
   const rules = rulesFor(state.gameType);
   const [numbers, bonus] = rules.phases;
+  $('finished-badge').textContent = rules.name;
   $('finished-title').textContent = `Votre grille ${rules.name} est prête ! 🎉`;
   $('final-grid').innerHTML = gridBalls(state.validated[numbers.key], state.validated[bonus.key]);
   const url = `${location.origin}/grille/${encodeURIComponent(roomId)}`;

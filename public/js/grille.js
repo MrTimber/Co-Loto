@@ -30,14 +30,14 @@ try {
   if (!res.ok) throw new Error(body.error);
   const rules = rulesFor(body.gameType);
   applyTheme(rules.id);
-  document.title = `Co-Loto · Grille ${rules.name} co-créée`;
+  document.title = `Co-Loto · Votre grille ${rules.name}`;
   const created = new Date(body.createdAt).toLocaleDateString('fr-FR', dateFormat);
   const expires = new Date(body.expiresAt).toLocaleDateString('fr-FR', dateFormat);
   card.replaceChildren(
     el('p', 'game-badge', rules.name),
-    el('h1', '', `Grille ${rules.name} co-créée`),
+    el('h1', '', `Votre grille ${rules.name}`),
     el('div', 'summary big', ...balls(body.numbers, 'validated'), ...balls(body.bonus, 'bonus')),
-    el('p', '', 'Choisie par ', ...listNames(body.players), ` en ${body.rounds} tours, le ${created}.`),
+    el('p', '', 'Co-créée par ', ...listNames(body.players), ` en ${body.rounds} tours, le ${created}.`),
   );
   if (body.drawDate) {
     card.append(el('p', '', `Tirage prévu : ${formatDrawDate(body.drawDate)}. La vérification des résultats arrivera dans une prochaine version.`));
