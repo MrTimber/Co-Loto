@@ -70,6 +70,8 @@ export function createApp({
   app.get('/js/games.js', (req, res) => res.sendFile(GAMES_MODULE));
   app.use(express.static(PUBLIC_DIR, { extensions: ['html'] }));
 
+  // Ancienne adresse de l'espace personnel (liens et favoris déjà enregistrés).
+  app.get('/mes-grilles', (req, res) => res.redirect(301, '/mon-espace'));
   app.get('/salon/:id', (req, res) => res.sendFile('salon.html', { root: PUBLIC_DIR }));
   app.get('/grille/:id', (req, res) => res.sendFile('grille.html', { root: PUBLIC_DIR }));
 

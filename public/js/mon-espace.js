@@ -101,7 +101,7 @@ if (user) {
   await claimStoredGrids();
   const res = await fetch('/api/compte/grilles');
   const grids = res.ok ? await res.json() : [];
-  card.replaceChildren(el('h1', '', 'Mes grilles'));
+  card.replaceChildren(el('h1', '', 'Mon espace'), el('h2', '', 'Mes grilles'));
   if (grids.length) {
     card.append(el('ul', 'my-grids', ...grids.map(gridItem)));
   } else {
@@ -110,8 +110,8 @@ if (user) {
   card.append(profileForm(user), ...accountActions(user));
 } else {
   card.replaceChildren(
-    el('h1', '', 'Mes grilles'),
+    el('h1', '', 'Mon espace'),
     el('p', '', 'Connectez-vous pour retrouver les grilles que vous avez co-créées, pendant 30 jours.'),
-    providers.length ? providerButtons(providers, '/mes-grilles') : el('p', 'muted', 'La connexion n’est pas encore disponible sur ce site.'),
+    providers.length ? providerButtons(providers, '/mon-espace') : el('p', 'muted', 'La connexion n’est pas encore disponible sur ce site.'),
   );
 }

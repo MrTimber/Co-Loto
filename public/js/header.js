@@ -1,4 +1,4 @@
-// En-tête : lien « Se connecter » ou « Mes grilles » (seulement si la connexion est proposée).
+// En-tête : lien « Se connecter » ou « Mon espace » (seulement si la connexion est proposée).
 // Sur petit écran, les liens sont regroupés dans un menu burger.
 import { getAccount, claimStoredGrids, currentPath, el } from './account.js';
 
@@ -8,8 +8,8 @@ if (header && (user || providers.length)) {
   const links = el('div', 'account-links');
   links.id = 'account-menu';
   if (user) {
-    const link = el('a', '', 'Mes grilles');
-    link.href = '/mes-grilles';
+    const link = el('a', '', 'Mon espace');
+    link.href = '/mon-espace';
     links.append(link);
   } else if (location.pathname !== '/connexion') {
     const link = el('a', '', 'Se connecter');
@@ -43,6 +43,6 @@ if (header && (user || providers.length)) {
     nav.append(toggle, links);
     header.append(nav);
   }
-  // Grilles jouées sur cet appareil avant la connexion : ajoutées à « Mes grilles ».
+  // Grilles jouées sur cet appareil avant la connexion : ajoutées à « Mon espace ».
   if (user) await claimStoredGrids();
 }

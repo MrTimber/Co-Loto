@@ -179,3 +179,10 @@ test("l'application est installable : manifeste, icônes et service worker", asy
   assert.equal((await fetch(`${baseUrl}/icons/apple-touch-icon.png`)).status, 200);
   assert.equal((await fetch(`${baseUrl}/favicon.ico`)).status, 200);
 });
+
+test("l'espace personnel est à /mon-espace, l'ancienne adresse y redirige", async () => {
+  assert.equal((await fetch(`${baseUrl}/mon-espace`)).status, 200);
+  const old = await fetch(`${baseUrl}/mes-grilles`, { redirect: 'manual' });
+  assert.equal(old.status, 301);
+  assert.equal(old.headers.get('location'), '/mon-espace');
+});

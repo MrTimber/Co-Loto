@@ -135,7 +135,7 @@ async function playGame() {
   return { roomId: created.roomId, aliceToken: created.token, bobToken: bobJoin.token };
 }
 
-test('un joueur anonyme se connecte après la partie et retrouve la grille dans « Mes grilles »', async () => {
+test('un joueur anonyme se connecte après la partie et retrouve la grille dans « Mon espace »', async () => {
   const { roomId, aliceToken, bobToken } = await playGame();
 
   const anonymous = await (await request('/api/compte')).json();
@@ -185,7 +185,7 @@ test('un joueur anonyme se connecte après la partie et retrouve la grille dans 
 });
 
 test('connexion GitHub : redirection, contrôle de l’état et création du compte', async (t) => {
-  const start = await request('/auth/github?retour=/mes-grilles');
+  const start = await request('/auth/github?retour=/mon-espace');
   assert.equal(start.status, 302);
   const location = new URL(start.headers.get('location'));
   assert.equal(location.origin + location.pathname, 'https://github.com/login/oauth/authorize');
@@ -199,7 +199,7 @@ test('connexion GitHub : redirection, contrôle de l’état et création du com
 
   // État absent ou différent : la connexion est refusée.
   const forged = await request('/auth/github/callback?code=abc&state=autre', { cookie: oauthCookie });
-  assert.equal(forged.headers.get('location'), '/connexion?erreur=1&retour=%2Fmes-grilles');
+  assert.equal(forged.headers.get('location'), '/connexion?erreur=1&retour=%2Fmon-espace');
   assert.equal(sessionCookie(forged), undefined);
 
   let tokenRequest;
@@ -218,7 +218,7 @@ test('connexion GitHub : redirection, contrôle de l’état et création du com
     return realFetch(input, init);
   };
   const callback = await request(`/auth/github/callback?code=abc&state=${state}`, { cookie: oauthCookie });
-  assert.equal(callback.headers.get('location'), '/mes-grilles');
+  assert.equal(callback.headers.get('location'), '/mon-espace');
   // Le code est échangé avec le vérificateur PKCE correspondant et la même adresse de rappel.
   assert.equal(tokenRequest.get('code'), 'abc');
   assert.equal(tokenRequest.get('redirect_uri'), 'https://co-loto.example/auth/github/callback');
@@ -236,11 +236,11 @@ test('après connexion, retour uniquement vers une page connue du site', async (
   const cases = {
     '/': '/',
     [`/salon/${roomId}`]: `/salon/${roomId}`,
-    '/salon/inconnu': '/mes-grilles',
-    '/grille/inconnue': '/mes-grilles',
-    '//evil.example': '/mes-grilles',
-    '/\\evil.example': '/mes-grilles',
-    'https://evil.example': '/mes-grilles',
+    '/salon/inconnu': '/mon-espace',
+    '/grille/inconnue': '/mon-espace',
+    '//evil.example': '/mon-espace',
+    '/\\evil.example': '/mon-espace',
+    'https://evil.example': '/mon-espace',
   };
   for (const [retour, expected] of Object.entries(cases)) {
     const res = await request(`/auth/dev?retour=${encodeURIComponent(retour)}`);
@@ -249,7 +249,7 @@ test('après connexion, retour uniquement vers une page connue du site', async (
 });
 
 test('connexion Facebook : seul l’email est demandé, le pseudo vient des parties', async (t) => {
-  const start = await request('/auth/facebook?retour=/mes-grilles&pseudo=Lulu');
+  const start = await request('/auth/facebook?retour=/mon-espace&pseudo=Lulu');
   const location = new URL(start.headers.get('location'));
   assert.equal(location.origin + location.pathname, 'https://www.facebook.com/v23.0/dialog/oauth');
   assert.equal(location.searchParams.get('scope'), 'email');
@@ -268,7 +268,7 @@ test('connexion Facebook : seul l’email est demandé, le pseudo vient des part
     return realFetch(input, init);
   };
   const callback = await request(`/auth/facebook/callback?code=abc&state=${location.searchParams.get('state')}`, { cookie: oauthCookie });
-  assert.equal(callback.headers.get('location'), '/mes-grilles');
+  assert.equal(callback.headers.get('location'), '/mon-espace');
   assert.equal(new URL(profileUrl).searchParams.get('fields'), 'id,email');
   const account = await (await request('/api/compte', { cookie: sessionCookie(callback) })).json();
   assert.deepEqual(account.user, { name: 'Lulu', provider: 'facebook', email: 'lulu@example.com', emailVerified: true, emailConsent: false });

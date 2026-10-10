@@ -55,7 +55,7 @@ Le jeu est choisi à la création du salon :
 
 - Les joueurs jouent la grille co-créée comme ils le souhaitent : en point de vente, sur le site de la FDJ, chacun de leur côté, ou ensemble en partageant les gains.
 - La grille reste consultable **30 jours** après sa création grâce à l'**URL unique** de la partie.
-- Un joueur connecté retrouve toutes ses grilles dans **« Mes grilles »**, où il peut aussi modifier son pseudo et son adresse email, accepter de recevoir les résultats par email, et supprimer son compte. Un joueur qui a joué sans compte se voit proposer, à la fin de la partie, de se connecter : la grille qu'il vient de co-créer est alors ajoutée à son espace.
+- Un joueur connecté retrouve toutes ses grilles dans **« Mon espace »**, où il peut aussi modifier son pseudo et son adresse email, accepter de recevoir les résultats par email, et supprimer son compte. Un joueur qui a joué sans compte se voit proposer, à la fin de la partie, de se connecter : la grille qu'il vient de co-créer est alors ajoutée à son espace.
 - Si une date de tirage a été indiquée, le résultat de la grille est évalué à la publication des résultats officiels et affiché sur la page de la grille.
 - Les joueurs qui ont renseigné leur adresse email et donné leur accord peuvent **recevoir le résultat par email**.
 
@@ -71,7 +71,7 @@ Le jeu est choisi à la création du salon :
 - [x] Page de consultation de la grille (30 jours, URL unique)
 - [x] Date de tirage optionnelle (limitée aux jours de tirage du jeu)
 - [x] Installable comme une application sur smartphone et tablette (PWA)
-- [x] Connexion facultative (Google, Microsoft, GitHub, Discord, Facebook) et page « Mes grilles »
+- [x] Connexion facultative (Google, Microsoft, GitHub, Discord, Facebook) et page « Mon espace »
 - [ ] Vérification des résultats officiels à la date du tirage
 - [ ] Envoi des résultats par email (avec consentement)
 
@@ -104,7 +104,7 @@ Organisation du code :
 src/game.js       Règles du jeu (sans réseau, entièrement testées)
 src/app.js        Serveur HTTP, API et événements temps réel
 src/store.js      Stockage des grilles terminées (30 jours), des comptes et des sessions (Turso ou fichier SQLite)
-src/auth.js       Connexion Google, Microsoft, GitHub, Discord, Facebook (OAuth 2.0 avec openid-client) et API « Mes grilles »
+src/auth.js       Connexion Google, Microsoft, GitHub, Discord, Facebook (OAuth 2.0 avec openid-client) et API « Mon espace »
 src/drawDate.js   Validation de la date de tirage
 src/index.js      Point d'entrée
 public/           Pages web (accueil, salon, grille, page hors ligne)
@@ -237,14 +237,14 @@ Les aperçus de pull request ont une autre adresse : la connexion n'y fonctionne
 1. **Créer une app**, cas d'usage **Authentifier et demander des données aux utilisateurs avec Facebook Login**, puis nom `Co-Loto` et email de contact.
 2. **Cas d'usage** > **Personnaliser** : vérifiez que l'autorisation **email** est ajoutée (en plus de `public_profile`).
 3. **Facebook Login** > **Paramètres** : dans **URI de redirection OAuth valides**, ajoutez l'URL de rappel et enregistrez.
-4. **Paramètres de l'app** > **Général** : renseignez l'URL de la politique de confidentialité (`https://co-loto.com/confidentialite`) et, pour la suppression des données, la même page (elle explique comment supprimer son compte depuis « Mes grilles »). Copiez l'**ID de l'app** dans `FACEBOOK_CLIENT_ID` et la **clé secrète** dans `FACEBOOK_CLIENT_SECRET`.
+4. **Paramètres de l'app** > **Général** : renseignez l'URL de la politique de confidentialité (`https://co-loto.com/confidentialite`) et, pour la suppression des données, la même page (elle explique comment supprimer son compte depuis « Mon espace »). Copiez l'**ID de l'app** dans `FACEBOOK_CLIENT_ID` et la **clé secrète** dans `FACEBOOK_CLIENT_SECRET`.
 5. Passez l'app du mode **Développement** au mode **Live** (en haut de la page) : sans cela, seuls les administrateurs de l'app peuvent se connecter. Les autorisations `email` et `public_profile` ne demandent pas d'examen par Meta.
 
-Co-Loto demande à chaque service l'accès à l'adresse email, pour pouvoir envoyer plus tard les résultats des grilles (uniquement avec l'accord du joueur, donné dans « Mes grilles »). Données conservées : le fournisseur, l'identifiant technique qu'il donne, l'adresse email et un pseudo (celui des parties, ou le pseudo GitHub ou Discord ; jamais les vrais nom et prénom). Le joueur modifie son pseudo et son email dans « Mes grilles », et peut y supprimer son compte. Le détail est sur la page `/confidentialite` du site.
+Co-Loto demande à chaque service l'accès à l'adresse email, pour pouvoir envoyer plus tard les résultats des grilles (uniquement avec l'accord du joueur, donné dans « Mon espace »). Données conservées : le fournisseur, l'identifiant technique qu'il donne, l'adresse email et un pseudo (celui des parties, ou le pseudo GitHub ou Discord ; jamais les vrais nom et prénom). Le joueur modifie son pseudo et son email dans « Mon espace », et peut y supprimer son compte. Le détail est sur la page `/confidentialite` du site.
 
 #### Base de données Turso (conserver les grilles)
 
-Le disque de l'offre gratuite de Render est effacé à chaque redéploiement ou mise en veille (voir plus bas). Pour que les grilles, les comptes et « Mes grilles » soient conservés, Co-Loto utilise une base [Turso](https://turso.tech/) gratuite (SQLite hébergé) dès que ses deux variables sont définies :
+Le disque de l'offre gratuite de Render est effacé à chaque redéploiement ou mise en veille (voir plus bas). Pour que les grilles, les comptes et « Mon espace » soient conservés, Co-Loto utilise une base [Turso](https://turso.tech/) gratuite (SQLite hébergé) dès que ses deux variables sont définies :
 
 1. Sur [app.turso.tech](https://app.turso.tech/), créez une base (**Create Database**), par exemple `co-loto`, dans la région la plus proche de celle du service Render : **Europe (Ireland)** pour un service à Francfort, comme celui décrit par `render.yaml`.
 2. Sur la page de la base, copiez son **URL** (de la forme `libsql://co-loto-xxxx.turso.io`), puis cliquez sur **Create Token** et copiez le jeton (lecture et écriture, sans date d'expiration ou avec une date lointaine).
@@ -261,7 +261,7 @@ Chaque fusion dans `main` redéploie automatiquement le site (« Auto-Deploy »,
 #### Limites de l'offre gratuite
 
 - **Mise en veille :** le service s'endort après 15 minutes sans visite. La visite suivante le réveille, mais le premier chargement prend alors environ une minute. Une partie en cours n'est pas concernée, puisque les joueurs restent connectés.
-- **Disque éphémère :** les fichiers ne sont pas conservés lors d'un redéploiement, d'un redémarrage ou d'une mise en veille. Sans base Turso, le fichier SQLite des grilles terminées est donc effacé à ces moments-là, et les liens `/grille/...` ne fonctionnent plus ; les comptes, les sessions et la liste « Mes grilles » aussi. Avec Turso (voir plus haut), tout cela est conservé. Les salons en cours restent perdus lors d'un redéploiement, puisqu'ils vivent en mémoire.
+- **Disque éphémère :** les fichiers ne sont pas conservés lors d'un redéploiement, d'un redémarrage ou d'une mise en veille. Sans base Turso, le fichier SQLite des grilles terminées est donc effacé à ces moments-là, et les liens `/grille/...` ne fonctionnent plus ; les comptes, les sessions et la liste « Mon espace » aussi. Avec Turso (voir plus haut), tout cela est conservé. Les salons en cours restent perdus lors d'un redéploiement, puisqu'ils vivent en mémoire.
 - **Quota mensuel :** l'offre gratuite donne 750 heures d'exécution par mois et par espace de travail, de quoi faire tourner un service en continu.
 
 ## Prochaines étapes
