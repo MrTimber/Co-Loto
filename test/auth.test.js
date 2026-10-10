@@ -217,7 +217,8 @@ test('connexion GitHub : redirection, contrôle de l’état et création du com
     }
     return realFetch(input, init);
   };
-  const callback = await request(`/auth/github/callback?code=abc&state=${state}`, { cookie: oauthCookie });
+  // GitHub ajoute l'émetteur au retour de connexion (RFC 9207).
+  const callback = await request(`/auth/github/callback?code=abc&state=${state}&iss=${encodeURIComponent('https://github.com/login/oauth')}`, { cookie: oauthCookie });
   assert.equal(callback.headers.get('location'), '/mon-espace');
   // Le code est échangé avec le vérificateur PKCE correspondant et la même adresse de rappel.
   assert.equal(tokenRequest.get('code'), 'abc');

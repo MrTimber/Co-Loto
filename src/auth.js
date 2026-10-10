@@ -50,7 +50,9 @@ export const PROVIDERS = {
     label: 'GitHub',
     envPrefix: 'GITHUB',
     server: {
-      issuer: 'https://github.com',
+      // Valeur du paramètre `iss` que GitHub ajoute au retour de connexion (RFC 9207) :
+      // elle doit être identique, sinon le retour est refusé.
+      issuer: 'https://github.com/login/oauth',
       authorization_endpoint: 'https://github.com/login/oauth/authorize',
       token_endpoint: 'https://github.com/login/oauth/access_token',
     },
