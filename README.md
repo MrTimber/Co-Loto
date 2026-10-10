@@ -25,7 +25,7 @@ Dès que **2 personnes** sont présentes dans le salon (créateur compris), le c
 
 ### 3. Les tours de jeu
 
-L'écran affiche **une seule grille**, qui réunit les choix du joueur et les numéros validés par tout le monde :
+L'écran affiche une grille qui réunit les choix du joueur et les numéros validés par tout le monde :
 
 | Case | Signification |
 |---|---|
@@ -67,7 +67,7 @@ Le jeu est choisi à la création du salon :
 - [x] Création de salon (public / privé, 2 à 12 joueurs) et liste des salons publics sur l'accueil
 - [x] Invitation par lien privé (copie du lien, email, partage depuis le téléphone)
 - [x] Salle d'attente en temps réel
-- [x] Grille unique de jeu, synchronisée en temps réel (ses choix et les numéros validés par tous)
+- [x] Grille de jeu synchronisée en temps réel (ses choix et les numéros validés par tous)
 - [x] Validation des numéros par consensus
 - [x] Numéros validés en surnombre : grille multiple ou grille simple, au choix
 - [x] Choix du numéro chance, des étoiles ou du numéro Dream
