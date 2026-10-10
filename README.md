@@ -6,7 +6,7 @@
 
 ## Principe
 
-Chaque joueur choisit des numéros dans sa grille personnelle. Un numéro n'entre dans la grille collective que lorsque **tous** les joueurs l'ont choisi. La grille finale est donc le fruit d'un vrai consensus.
+Chaque joueur choisit des numéros, un par tour, sans voir les choix des autres. Un numéro n'est retenu dans la grille commune que lorsque **tous** les joueurs l'ont choisi. La grille finale est donc le fruit d'un vrai consensus.
 
 ## Déroulement d'une partie
 
@@ -25,17 +25,21 @@ Dès que **2 personnes** sont présentes dans le salon (créateur compris), le c
 
 ### 3. Les tours de jeu
 
-L'écran affiche deux grilles :
+L'écran affiche **une seule grille**, qui réunit les choix du joueur et les numéros validés par tout le monde :
 
-| À gauche | À droite |
+| Case | Signification |
 |---|---|
-| La **grille personnelle** du joueur | La **grille collective** |
+| **Ce tour** | Le numéro que le joueur vient de choisir, qu'il peut encore changer |
+| **Déjà choisi** | Un numéro choisi par le joueur à un tour précédent, mais pas encore par tous |
+| **Validé par tous** | Un numéro choisi par tous les joueurs, retenu pour la grille commune |
+
+Au-dessus de la grille, un bandeau indique le tour en cours, le nombre de numéros déjà validés et les joueurs qui ont déjà choisi.
 
 À chaque tour :
 
-1. Chaque joueur choisit dans sa grille personnelle un numéro qu'il n'a pas encore choisi.
+1. Chaque joueur choisit dans la grille un numéro qu'il n'a pas encore choisi.
 2. Le tour se termine quand tous les participants ont fait leur choix.
-3. Le système examine alors l'ensemble des grilles personnelles : tout numéro choisi par **tous** les joueurs (tous tours confondus) est **validé** et apparaît sur la grille collective.
+3. Le système examine alors les choix de chacun : tout numéro choisi par **tous** les joueurs (tous tours confondus) est **validé**. Le résultat du tour (« Fin du tour : … validé par tout le monde ! » ou « Aucun numéro validé à ce tour ») reste affiché deux secondes, avec une animation sur les numéros validés, avant le tour suivant.
 
 ### 4. Les numéros, puis les numéros complémentaires
 
@@ -47,28 +51,28 @@ Le jeu est choisi à la création du salon :
 | Euromillions | 5 parmi 1 à 50 | 2 étoiles parmi 1 à 12 | mardi, vendredi |
 | EuroDreams | 6 parmi 1 à 40 | 1 numéro Dream parmi 1 à 5 | lundi, jeudi |
 
-- Une fois que la grille collective contient tous ses numéros, la partie passe aux numéros complémentaires, selon le même principe.
-- Quand le dernier numéro complémentaire est validé collectivement, **la partie est terminée**.
+- Une fois que la grille contient tous ses numéros, la partie passe aux numéros complémentaires, selon le même principe. La grille n'affiche que la phase en cours : d'abord les numéros, puis les numéros complémentaires (étoiles pour l'Euromillions, gouttes pour le numéro Dream).
+- Quand le dernier numéro complémentaire est validé collectivement, **la partie est terminée** et la grille co-créée s'affiche.
 - Le fond de page reprend le dégradé de couleur du jeu choisi.
 
 ### 5. Après la partie
 
 - Les joueurs jouent la grille co-créée comme ils le souhaitent : en point de vente, sur le site de la FDJ, chacun de leur côté, ou ensemble en partageant les gains.
-- La grille reste consultable **30 jours** après sa création grâce à l'**URL unique** de la partie.
+- La grille reste consultable **30 jours** après sa création grâce à l'**URL unique** de la partie (`/grille/...`), que l'on peut copier ou partager depuis l'écran de fin.
 - Un joueur connecté retrouve toutes ses grilles dans **« Mon espace »**, où il peut aussi modifier son pseudo et son adresse email, accepter de recevoir les résultats par email, et supprimer son compte. Un joueur qui a joué sans compte se voit proposer, à la fin de la partie, de se connecter : la grille qu'il vient de co-créer est alors ajoutée à son espace.
-- Si une date de tirage a été indiquée, le résultat de la grille est évalué à la publication des résultats officiels et affiché sur la page de la grille.
-- Les joueurs qui ont renseigné leur adresse email et donné leur accord peuvent **recevoir le résultat par email**.
+- Si une date de tirage a été indiquée, elle s'affiche sur la page de la grille. À terme, le résultat de la grille sera évalué à la publication des résultats officiels et affiché sur cette page, et les joueurs qui ont renseigné leur adresse email et donné leur accord le **recevront par email** (pas encore disponible, voir « Prochaines étapes »).
 
 ## Fonctionnalités
 
-- [x] Création de salon (public / privé, 2 à 12 joueurs)
+- [x] Création de salon (public / privé, 2 à 12 joueurs) et liste des salons publics sur l'accueil
 - [x] Invitation par lien privé (copie du lien, email, partage depuis le téléphone)
 - [x] Salle d'attente en temps réel
-- [x] Grille personnelle et grille collective synchronisées
+- [x] Grille unique de jeu, synchronisée en temps réel (ses choix et les numéros validés par tous)
 - [x] Validation des numéros par consensus
+- [x] Numéros validés en surnombre : grille multiple ou grille simple, au choix
 - [x] Choix du numéro chance, des étoiles ou du numéro Dream
 - [x] Loto, Euromillions et EuroDreams
-- [x] Page de consultation de la grille (30 jours, URL unique)
+- [x] Page de consultation de la grille (30 jours, URL unique), partage du lien en fin de partie
 - [x] Date de tirage optionnelle (limitée aux jours de tirage du jeu)
 - [x] Installable comme une application sur smartphone et tablette (PWA)
 - [x] Connexion facultative (Google, Microsoft, GitHub, Discord, Facebook) et page « Mon espace »
@@ -79,7 +83,15 @@ Le jeu est choisi à la création du salon :
 
 - Pendant un tour, chaque joueur peut changer son choix tant que tous les joueurs n'ont pas choisi.
 - Les choix des autres joueurs restent secrets : on voit seulement qui a déjà choisi.
-- Si plusieurs numéros deviennent unanimes au même tour alors qu'il reste moins de places, un tirage au sort départage les candidats.
+- Si plusieurs numéros deviennent unanimes au même tour alors qu'il reste moins de places, ils sont **tous gardés** : la grille peut alors compter plus de numéros que prévu (par exemple 6 numéros au lieu de 5 au Loto). Le bandeau de fin de tour le signale. À la fin, chaque joueur choisit de son côté de tous les jouer en **grille multiple**, plus chère, ou d'en écarter pour jouer une **grille simple** : il touche un numéro pour l'écarter ou le reprendre, et Co-Loto affiche le nombre de combinaisons et le prix par tirage, ou prévient si la combinaison dépasse les limites du jeu. Limites des grilles multiples d'après les règlements FDJ :
+
+  | Jeu | Numéros | Numéros complémentaires au plus |
+  |---|---|---|
+  | Loto | 5 ou 6 / 7 / 8 / 9 | 10 / 8 / 3 / 1 numéros chance |
+  | Euromillions | 5 ou 6 / 7 / 8 / 9 / 10 | 12 / 6 / 4 / 3 / 2 étoiles |
+  | EuroDreams | 6 à 8 / 9 / 10 | 5 / 3 / 1 numéros Dream |
+
+  Prix d'une grille simple, sans option : 2,20 € au Loto, 2,50 € à l'Euromillions (My Million compris) et à EuroDreams. Co-Loto informe seulement : rien n'est parié sur le site.
 - Les choix des numéros complémentaires repartent de zéro : ils sont indépendants des numéros déjà choisis.
 - Un joueur qui ferme sa page peut revenir avec le même lien (son navigateur garde un jeton). S'il reste déconnecté plus de 90 secondes, il quitte la partie et le tour continue sans lui. Si le créateur part, le rôle passe au joueur suivant.
 
@@ -101,13 +113,15 @@ Tout est gratuit et open source :
 Organisation du code :
 
 ```
+src/games.js      Description des jeux (numéros, jours de tirage, grilles multiples et prix), aussi servie au navigateur
 src/game.js       Règles du jeu (sans réseau, entièrement testées)
 src/app.js        Serveur HTTP, API et événements temps réel
 src/store.js      Stockage des grilles terminées (30 jours), des comptes et des sessions (Turso ou fichier SQLite)
 src/auth.js       Connexion Google, Microsoft, GitHub, Discord, Facebook (OAuth 2.0 avec openid-client) et API « Mon espace »
 src/drawDate.js   Validation de la date de tirage
 src/index.js      Point d'entrée
-public/           Pages web (accueil, salon, grille, page hors ligne)
+public/           Pages web (accueil, salon, grille, connexion, « Mon espace », confidentialité, page hors ligne)
+public/js/        Scripts des pages (modules JavaScript)
 public/sw.js      Service worker (installation, copie des fichiers statiques)
 test/             Tests automatisés
 ```
@@ -266,8 +280,8 @@ Chaque fusion dans `main` redéploie automatiquement le site (« Auto-Deploy »,
 
 ## Prochaines étapes
 
-- Récupération des résultats officiels du Loto après chaque tirage et calcul du rang de gain de chaque grille.
-- Adresse email facultative avec consentement, et envoi du résultat.
+- Récupération des résultats officiels du Loto, de l'Euromillions et d'EuroDreams après chaque tirage, et calcul du rang de gain de chaque grille.
+- Envoi du résultat par email aux joueurs qui l'ont accepté dans « Mon espace » (l'adresse et l'accord sont déjà enregistrés).
 
 ## Contribuer
 
