@@ -78,6 +78,7 @@ h2 { font-size: 1.15rem; margin: 0 0 .75rem; }
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   gap: .5rem 1rem;
+  position: relative; /* ancre du menu burger */
   align-items: center;
   padding: .75rem 1rem;
   border-bottom: 1px solid var(--border);
@@ -322,7 +323,6 @@ form label.game-option {
 .account { display: flex; gap: 1rem; align-items: center; font-weight: 600; }
 .account a { color: var(--brand); }
 /* Menu burger sur petit écran : les liens du compte s'ouvrent sous l'en-tête. */
-.site-header { position: relative; }
 .menu-toggle { display: none; padding: .45rem; border: 0; background: none; color: var(--brand); line-height: 0; }
 .menu-toggle svg { width: 28px; height: 28px; }
 @media (max-width: 600px) {
