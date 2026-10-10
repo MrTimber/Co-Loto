@@ -8,6 +8,41 @@ const select = form.elements.maxPlayers;
 for (let n = 2; n <= 12; n++) select.add(new Option(`${n} joueurs`, n, n === 12, n === 12));
 form.elements.name.value = localStorage.getItem('coloto:name') ?? '';
 
+// Le formulaire en cours de saisie est gardé pendant la session : revenir à l'accueil
+// (par le logo, par exemple) ne ramène pas au Loto et n'efface pas les choix déjà faits.
+const DRAFT_KEY = 'coloto:create-form';
+const DRAFT_FIELDS = ['name', 'gameType', 'maxPlayers', 'visibility', 'drawDate'];
+function loadDraft() {
+  try {
+    return JSON.parse(sessionStorage.getItem(DRAFT_KEY)) ?? {};
+  } catch {
+    return {};
+  }
+}
+function saveDraft() {
+  const data = Object.fromEntries(new FormData(form));
+  try {
+    sessionStorage.setItem(DRAFT_KEY, JSON.stringify(Object.fromEntries(DRAFT_FIELDS.map((key) => [key, data[key]]))));
+  } catch {
+    // stockage indisponible (navigation privée…) : le formulaire repart de zéro
+  }
+}
+// Une valeur n'est reprise que si elle figure parmi les choix proposés.
+function restoreField(key, value) {
+  const field = form.elements[key];
+  if (typeof value !== 'string') return;
+  if (field instanceof RadioNodeList) {
+    const radio = [...field].find((r) => r.value === value);
+    if (radio) radio.checked = true;
+  } else if (field instanceof HTMLSelectElement) {
+    if ([...field.options].some((o) => o.value === value)) field.value = value;
+  } else if (field) {
+    field.value = value;
+  }
+}
+const draft = loadDraft();
+for (const key of ['name', 'gameType', 'maxPlayers', 'visibility']) restoreField(key, draft[key]);
+
 const monthFormat = new Intl.DateTimeFormat('fr-FR', { month: 'long', year: 'numeric', timeZone: 'UTC' });
 
 // Seuls les jours de tirage du jeu sont proposés, groupés par mois. Une date déjà
@@ -33,12 +68,16 @@ function fillDrawDates(rules) {
 function selectGame() {
   const rules = rulesFor(form.elements.gameType.value);
   applyTheme(rules.id);
+  document.getElementById('header-badge').textContent = rules.name;
   document.getElementById('game-summary').textContent = `${describeGame(rules)[0].toUpperCase()}${describeGame(rules).slice(1)}`;
   document.getElementById('draw-days').textContent = `${rules.theName} est tiré ${rules.drawDays}.`;
   fillDrawDates(rules);
 }
 form.elements.gameType.forEach((radio) => radio.addEventListener('change', selectGame));
 selectGame();
+restoreField('drawDate', draft.drawDate);
+form.addEventListener('input', saveDraft);
+form.addEventListener('change', saveDraft);
 
 form.addEventListener('submit', async (event) => {
   event.preventDefault();

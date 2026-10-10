@@ -132,8 +132,8 @@ export function isEmail(value) {
   return domain.includes('.') && !domain.startsWith('.') && !domain.endsWith('.');
 }
 
-const DEFAULT_RETURN = '/mes-grilles';
-const STATIC_RETURNS = new Map(['/', '/mes-grilles', '/confidentialite'].map((path) => [path, path]));
+const DEFAULT_RETURN = '/mon-espace';
+const STATIC_RETURNS = new Map(['/', '/mon-espace', '/confidentialite'].map((path) => [path, path]));
 
 // `findRoomId` : identifiant d'un salon ouvert, ou undefined.
 export function createAuth({ store, env = process.env, findRoomId = () => undefined, fetchImpl = (...args) => globalThis.fetch(...args) }) {

@@ -11,9 +11,11 @@ export const DEFAULT_MAX_PLAYERS = 12;
 export const MAX_NAME_LENGTH = 24;
 
 export class GameError extends Error {
-  constructor(code, message) {
+  // `details` : informations ajoutées à la réponse envoyée au joueur.
+  constructor(code, message, details = {}) {
     super(message);
     this.code = code;
+    this.details = details;
   }
 }
 

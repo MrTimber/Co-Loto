@@ -61,8 +61,8 @@ export async function renderGridAccountOffer(container, gridId) {
   if (user) {
     const claimed = await claimGrid(gridId);
     if (!claimed) return;
-    const link = el('a', '', 'Mes grilles');
-    link.href = '/mes-grilles';
+    const link = el('a', '', 'Mon espace');
+    link.href = '/mon-espace';
     container.replaceChildren(el('p', 'small', '✓ Cette grille est enregistrée dans ', link, '.'));
   } else {
     if (!loadToken(gridId)) return;
@@ -70,7 +70,7 @@ export async function renderGridAccountOffer(container, gridId) {
     privacy.href = '/confidentialite';
     container.replaceChildren(
       el('h2', '', 'Retrouvez cette grille dans votre espace'),
-      el('p', 'small muted', 'Connectez-vous pour la garder dans « Mes grilles » et la retrouver depuis n’importe quel appareil.'),
+      el('p', 'small muted', 'Connectez-vous pour la garder dans « Mon espace » et la retrouver depuis n’importe quel appareil.'),
       providerButtons(providers, `/grille/${encodeURIComponent(gridId)}`),
       el('p', 'small muted', privacy, ' : un pseudo et votre adresse email, jamais vos nom et prénom.'),
     );
