@@ -24,7 +24,10 @@ function join(payload) {
       saveToken(roomId, res.token);
       return;
     }
-    if (res.code === 'name_required') return show('join');
+    if (res.code === 'name_required') {
+      showGame(res.gameType);
+      return show('join');
+    }
     if (res.code === 'room_not_found') {
       forgetToken(roomId);
       return checkFinishedGrid();
@@ -119,11 +122,17 @@ $('leave-lobby').addEventListener('click', () => {
   });
 });
 
+// Badge et couleurs du jeu du salon, dès la salle d'attente.
+function showGame(gameType) {
+  if (!gameType) return;
+  applyTheme(gameType);
+  $('header-badge').textContent = rulesFor(gameType).name;
+  $('header-badge').hidden = false;
+}
+
 function render() {
   if (!state?.me) return;
-  applyTheme(state.gameType);
-  $('header-badge').textContent = rulesFor(state.gameType).name;
-  $('header-badge').hidden = false;
+  showGame(state.gameType);
   if (state.status === 'lobby') renderLobby();
   else if (state.status === 'playing') renderGame();
   else if (state.status === 'finished') renderFinished();

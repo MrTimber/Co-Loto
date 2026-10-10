@@ -47,7 +47,7 @@ function handle(ack, action) {
     reply({ ok: true, ...result });
   } catch (err) {
     if (!(err instanceof GameError)) console.error(err);
-    reply(err instanceof GameError ? { ok: false, code: err.code, error: err.message } : { ok: false, error: 'Erreur inattendue.' });
+    reply(err instanceof GameError ? { ...err.details, ok: false, code: err.code, error: err.message } : { ok: false, error: 'Erreur inattendue.' });
   }
 }
 
@@ -216,7 +216,10 @@ export function createApp({
         let playerId = typeof token === 'string' ? room.tokens.get(token) : undefined;
         let newToken = null;
         if (!playerId) {
-          if (name === undefined) throw new GameError('name_required', 'Choisissez un pseudo pour rejoindre le salon.');
+          if (name === undefined) {
+            // Le jeu du salon permet d'afficher son badge et ses couleurs avant d'entrer.
+            throw new GameError('name_required', 'Choisissez un pseudo pour rejoindre le salon.', { gameType: room.game.gameType });
+          }
           ({ playerId, token: newToken } = joinAsNewPlayer(room, name));
         }
         clearTimeout(room.offlineTimers.get(playerId));

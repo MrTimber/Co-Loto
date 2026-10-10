@@ -138,7 +138,7 @@ Variables d'environnement facultatives :
 | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | Connexion avec GitHub | _(désactivée)_ |
 | `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET` | Connexion avec Discord | _(désactivée)_ |
 | `FACEBOOK_CLIENT_ID`, `FACEBOOK_CLIENT_SECRET` | Connexion avec Facebook | _(désactivée)_ |
-| `PUBLIC_URL` | Adresse publique du site, pour les URL de rappel (inutile sur Render, qui fournit `RENDER_EXTERNAL_URL`) | adresse de la requête |
+| `PUBLIC_URL` | Adresse publique du site, pour les URL de rappel de la connexion : `https://co-loto.com` en production (indispensable avec un nom de domaine personnalisé) | `RENDER_EXTERNAL_URL` sur Render (adresse `…onrender.com`), sinon adresse de la requête |
 | `AUTH_DEV_LOGIN` | `1` ajoute un « compte de test » sans fournisseur, pour le développement local (toujours ignoré sur Render) | _(désactivé)_ |
 
 Un fournisseur n'apparaît que si son identifiant **et** son secret sont définis. Sans aucun, le site fonctionne sans compte, comme avant.
@@ -197,21 +197,23 @@ Le fichier [`render.yaml`](render.yaml) du dépôt décrit déjà toute la confi
 
 La connexion est facultative et chaque fournisseur s'active séparément. Pour chacun, il faut créer une « application OAuth » dans la console du fournisseur, y déclarer l'**URL de rappel** ci-dessous, puis copier l'identifiant et le secret dans les variables d'environnement du service Render (**Environment** > **Add Environment Variable**, puis **Save Changes** : Render redéploie le site).
 
-Remplacez `https://co-loto-xxxx.onrender.com` par l'adresse réelle du site (sans `/` final) :
+Commencez par définir `PUBLIC_URL` = `https://co-loto.com` (sans `/` final) dans Render. Sans elle, le site annonce aux fournisseurs l'adresse `…onrender.com` fournie par Render : le joueur y revient sans le cookie posé sur co-loto.com, et la connexion échoue à chaque fois. Pour la même raison, `www.co-loto.com` doit rediriger vers `co-loto.com` (comportement par défaut de Render quand les deux domaines sont ajoutés dans **Settings** > **Custom Domains**).
+
+URL de rappel à déclarer chez chaque fournisseur, recopiée exactement :
 
 | Fournisseur | URL de rappel à déclarer |
 |---|---|
-| Google | `https://co-loto-xxxx.onrender.com/auth/google/callback` |
-| Microsoft | `https://co-loto-xxxx.onrender.com/auth/microsoft/callback` |
-| GitHub | `https://co-loto-xxxx.onrender.com/auth/github/callback` |
-| Discord | `https://co-loto-xxxx.onrender.com/auth/discord/callback` |
-| Facebook | `https://co-loto-xxxx.onrender.com/auth/facebook/callback` |
+| Google | `https://co-loto.com/auth/google/callback` |
+| Microsoft | `https://co-loto.com/auth/microsoft/callback` |
+| GitHub | `https://co-loto.com/auth/github/callback` |
+| Discord | `https://co-loto.com/auth/discord/callback` |
+| Facebook | `https://co-loto.com/auth/facebook/callback` |
 
 Les aperçus de pull request ont une autre adresse : la connexion n'y fonctionne que si l'URL de rappel de l'aperçu est aussi déclarée (GitHub n'en accepte qu'une par application ; créez au besoin une seconde application de test).
 
 **Google** ([console.cloud.google.com](https://console.cloud.google.com/))
 1. Créez un projet (sélecteur de projet en haut, puis **Nouveau projet**).
-2. Menu **API et services** > **Écran de consentement OAuth** (« Google Auth Platform ») : nom de l'application `Co-Loto`, email d'assistance, audience **Externe**, puis publiez l'application (**Audience** > **Publier l'application**) pour qu'elle soit ouverte à tous. Co-Loto ne demande que l'adresse email (`openid`, `email`) : aucune validation par Google n'est nécessaire.
+2. Menu **API et services** > **Écran de consentement OAuth** (« Google Auth Platform ») : nom de l'application `Co-Loto`, email d'assistance, audience **Externe**, puis publiez l'application (**Audience** > **Publier l'application**) pour qu'elle soit ouverte à tous. Co-Loto ne demande que l'adresse email (`openid`, `email`) : aucune validation par Google n'est nécessaire, à condition de ne pas ajouter de logo (un logo déclenche une vérification de la marque, qui prend plusieurs jours).
 3. **Clients** > **Créer un client** : type **Application Web**, ajoutez l'URL de rappel dans **URI de redirection autorisés**, puis **Créer**.
 4. Copiez l'**ID client** dans `GOOGLE_CLIENT_ID` et le **code secret** dans `GOOGLE_CLIENT_SECRET`.
 
@@ -219,7 +221,7 @@ Les aperçus de pull request ont une autre adresse : la connexion n'y fonctionne
 1. **Applications** > **Inscriptions d'applications** > **Nouvelle inscription**.
 2. Nom `Co-Loto` ; types de comptes : **Comptes dans un annuaire organisationnel et comptes Microsoft personnels** ; URI de redirection : plateforme **Web** et l'URL de rappel. Cliquez sur **S'inscrire**.
 3. Copiez l'**ID d'application (client)** dans `MICROSOFT_CLIENT_ID`.
-4. **Certificats et secrets** > **Nouveau secret client** : copiez tout de suite la **Valeur** (pas l'ID) dans `MICROSOFT_CLIENT_SECRET`. Notez sa date d'expiration (24 mois au plus) : il faudra le renouveler.
+4. **Certificats et secrets** > **Nouveau secret client** : copiez tout de suite la **Valeur** (pas l'ID du secret, erreur fréquente) dans `MICROSOFT_CLIENT_SECRET`. Notez sa date d'expiration (24 mois au plus) : il faudra le renouveler.
 
 **GitHub** ([github.com/settings/developers](https://github.com/settings/developers))
 1. **OAuth Apps** > **New OAuth App**.
@@ -235,7 +237,7 @@ Les aperçus de pull request ont une autre adresse : la connexion n'y fonctionne
 1. **Créer une app**, cas d'usage **Authentifier et demander des données aux utilisateurs avec Facebook Login**, puis nom `Co-Loto` et email de contact.
 2. **Cas d'usage** > **Personnaliser** : vérifiez que l'autorisation **email** est ajoutée (en plus de `public_profile`).
 3. **Facebook Login** > **Paramètres** : dans **URI de redirection OAuth valides**, ajoutez l'URL de rappel et enregistrez.
-4. **Paramètres de l'app** > **Général** : renseignez l'URL de la politique de confidentialité (`https://co-loto-xxxx.onrender.com/confidentialite`) et, pour la suppression des données, la même page (elle explique comment supprimer son compte depuis « Mes grilles »). Copiez l'**ID de l'app** dans `FACEBOOK_CLIENT_ID` et la **clé secrète** dans `FACEBOOK_CLIENT_SECRET`.
+4. **Paramètres de l'app** > **Général** : renseignez l'URL de la politique de confidentialité (`https://co-loto.com/confidentialite`) et, pour la suppression des données, la même page (elle explique comment supprimer son compte depuis « Mes grilles »). Copiez l'**ID de l'app** dans `FACEBOOK_CLIENT_ID` et la **clé secrète** dans `FACEBOOK_CLIENT_SECRET`.
 5. Passez l'app du mode **Développement** au mode **Live** (en haut de la page) : sans cela, seuls les administrateurs de l'app peuvent se connecter. Les autorisations `email` et `public_profile` ne demandent pas d'examen par Meta.
 
 Co-Loto demande à chaque service l'accès à l'adresse email, pour pouvoir envoyer plus tard les résultats des grilles (uniquement avec l'accord du joueur, donné dans « Mes grilles »). Données conservées : le fournisseur, l'identifiant technique qu'il donne, l'adresse email et un pseudo (celui des parties, ou le pseudo GitHub ou Discord ; jamais les vrais nom et prénom). Le joueur modifie son pseudo et son email dans « Mes grilles », et peut y supprimer son compte. Le détail est sur la page `/confidentialite` du site.

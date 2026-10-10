@@ -66,7 +66,13 @@ test('une partie complète, du salon à la grille consultable', async () => {
 
   const bob = client();
   const intruder = client();
-  assert.equal((await emit(bob, 'room:join', { roomId })).code, 'name_required');
+  // Avant d'entrer, le jeu du salon est connu (badge et couleurs de la salle d'attente).
+  assert.deepEqual(await emit(bob, 'room:join', { roomId }), {
+    ok: false,
+    code: 'name_required',
+    error: 'Choisissez un pseudo pour rejoindre le salon.',
+    gameType: 'loto',
+  });
   assert.equal((await emit(bob, 'room:join', { roomId, name: 'Bob' })).ok, true);
   assert.equal((await emit(intruder, 'room:join', { roomId, name: 'Chloé' })).code, 'room_full');
   assert.equal((await api('/api/lobbies')).body.some((l) => l.id === roomId), false);
