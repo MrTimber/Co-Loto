@@ -1,6 +1,7 @@
 // En-tête : lien « Se connecter » ou « Mon espace » (seulement si la connexion est proposée).
-// Sur petit écran, les liens sont regroupés dans un menu burger ; un administrateur a toujours
-// le menu burger, avec ses entrées en plus (chargées depuis l'espace d'administration).
+// Une personne connectée a toujours le menu burger, terminé par « Se déconnecter » ; un administrateur
+// y trouve ses entrées en plus (chargées depuis l'espace d'administration). Pour les visiteurs, le lien
+// n'est regroupé dans un menu burger que sur petit écran.
 import { getAccount, claimStoredGrids, currentPath, el } from './account.js';
 
 const header = document.querySelector('.site-header');
@@ -11,6 +12,7 @@ if (header && (user || providers.length)) {
   if (user) {
     const link = el('a', '', 'Mon espace');
     link.href = '/mon-espace';
+    if (location.pathname === link.pathname) link.setAttribute('aria-current', 'page');
     links.append(link);
   } else if (location.pathname !== '/connexion') {
     const link = el('a', '', 'Se connecter');
@@ -24,6 +26,15 @@ if (header && (user || providers.length)) {
     } catch {
       // rôle retiré entre-temps : menu habituel
     }
+  }
+  if (user) {
+    const logout = el('button', 'menu-logout', 'Se déconnecter');
+    logout.type = 'button';
+    logout.addEventListener('click', async () => {
+      await fetch('/auth/deconnexion', { method: 'POST' });
+      location.href = '/';
+    });
+    links.append(logout);
   }
   if (links.childElementCount) {
     const nav = el('nav', 'account');
@@ -41,7 +52,7 @@ if (header && (user || providers.length)) {
     };
     const small = matchMedia('(max-width: 600px)');
     const useMenu = () => {
-      nav.classList.toggle('menu', Boolean(user?.admin) || small.matches);
+      nav.classList.toggle('menu', Boolean(user) || small.matches);
       if (!nav.classList.contains('menu')) setOpen(false);
     };
     useMenu();
