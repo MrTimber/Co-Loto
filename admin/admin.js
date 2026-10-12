@@ -1,6 +1,6 @@
 // Espace d'administration : tableau de bord, utilisateurs, fréquentation et numéros joués.
 // Tout est construit nœud par nœud : aucune donnée reçue n'est interprétée comme du HTML.
-import { el } from '/js/account.js';
+import { el, formatDrawDate, formatDay, ballNodes } from '/js/common.js';
 import { GAMES, todayInFrance } from '/js/games.js';
 import { ADMIN_PAGES } from './menu.js';
 
@@ -12,9 +12,6 @@ const number = new Intl.NumberFormat('fr-FR');
 const decimal = new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 1 });
 const percent = new Intl.NumberFormat('fr-FR', { style: 'percent', maximumFractionDigits: 1 });
 const shortDate = (day) => new Date(`${day}T12:00:00Z`).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', timeZone: 'UTC' });
-const longDate = (value) => new Date(value).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
-const drawDateLabel = (day) =>
-  new Date(`${day}T12:00:00Z`).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
 const gameName = (id) => GAMES[id]?.name ?? id;
 const addDays = (day, n) => new Date(Date.parse(`${day}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
 
@@ -29,6 +26,18 @@ function button(label, className = '') {
   const node = el('button', className, label);
   node.type = 'button';
   return node;
+}
+
+// Liste déroulante : `choices` est une liste de [valeur, libellé].
+function selectOf(choices, selected) {
+  const select = el('select');
+  for (const [value, label] of choices) {
+    const option = el('option', '', label);
+    option.value = String(value);
+    option.selected = value === selected;
+    select.append(option);
+  }
+  return select;
 }
 
 // Onglets
@@ -198,14 +207,9 @@ function userGrids(grids) {
     'ul',
     'user-grids',
     ...grids.map((grid) => {
-      const link = el('a', '', `${gameName(grid.gameType)} du ${longDate(grid.createdAt)}`);
+      const link = el('a', '', `${gameName(grid.gameType)} du ${formatDay(grid.createdAt)}`);
       link.href = `/grille/${encodeURIComponent(grid.id)}`;
-      const balls = el(
-        'span',
-        'summary',
-        ...grid.numbers.map((n) => el('span', 'ball validated', String(n))),
-        ...grid.bonus.map((n) => el('span', 'ball bonus', String(n))),
-      );
+      const balls = el('span', 'summary', ...ballNodes(grid.numbers, grid.bonus));
       const item = el('li', '', link, balls, el('span', 'small muted', `Pseudo : ${grid.playerName} · avec ${grid.players.join(', ')}`));
       item.dataset.game = grid.gameType;
       return item;
@@ -218,8 +222,8 @@ function userItem(user, { canManage }) {
     user.providers.map((p) => PROVIDERS[p] ?? p).join(', '),
     user.email ? `${user.email} (${user.emailVerified ? 'vérifiée' : 'non vérifiée'})` : 'sans email',
     user.emailConsent ? 'accepte les résultats par email' : null,
-    `inscrit le ${longDate(user.createdAt)}`,
-    user.lastLoginAt ? `dernière connexion le ${longDate(user.lastLoginAt)}` : null,
+    `inscrit le ${formatDay(user.createdAt)}`,
+    user.lastLoginAt ? `dernière connexion le ${formatDay(user.lastLoginAt)}` : null,
   ].filter(Boolean);
   const gridsButton = button(user.grids ? `Voir ses grilles (${user.grids})` : 'Aucune grille', 'small');
   gridsButton.disabled = !user.grids;
@@ -324,13 +328,7 @@ function buckets(days, key) {
 
 async function renderTraffic(days = 30) {
   const data = await getJson(`/api/admin/frequentation?jours=${days}`);
-  const select = el('select');
-  for (const [value, label] of [[7, '7 derniers jours'], [30, '30 derniers jours'], [90, '3 derniers mois'], [365, '12 derniers mois']]) {
-    const option = el('option', '', label);
-    option.value = String(value);
-    option.selected = value === days;
-    select.append(option);
-  }
+  const select = selectOf([[7, '7 derniers jours'], [30, '30 derniers jours'], [90, '3 derniers mois'], [365, '12 derniers mois']], days);
   select.addEventListener('change', () => renderTraffic(Number(select.value)).catch(showError));
   const grouping = data.days.length > 31 ? ' (par semaine)' : ' (par jour)';
   const games = Object.fromEntries(Object.values(GAMES).map((g) => [g.id, g.name]));
@@ -415,25 +413,13 @@ async function renderNumbers() {
   const data = await getJson(`/api/admin/numeros?${params}`);
   const rules = GAMES[data.gameType];
 
-  const game = el('select');
-  for (const g of Object.values(GAMES)) {
-    const option = el('option', '', g.name);
-    option.value = g.id;
-    option.selected = g.id === s.game;
-    game.append(option);
-  }
+  const game = selectOf(Object.values(GAMES).map((g) => [g.id, g.name]), s.game);
   game.addEventListener('change', () => {
     Object.assign(s, { game: game.value, draw: '' });
     refresh();
   });
 
-  const mode = el('select');
-  for (const [value, label] of [['period', 'Une période'], ['draw', 'Un tirage']]) {
-    const option = el('option', '', label);
-    option.value = value;
-    option.selected = value === s.mode;
-    mode.append(option);
-  }
+  const mode = selectOf([['period', 'Une période'], ['draw', 'Un tirage']], s.mode);
   mode.addEventListener('change', () => {
     s.mode = mode.value;
     if (s.mode === 'draw' && !s.draw) s.draw = data.drawDates[0]?.date ?? '';
@@ -442,14 +428,8 @@ async function renderNumbers() {
 
   const filters = el('div', 'filters', el('label', '', 'Jeu', game), el('label', '', 'Grilles de', mode));
   if (s.mode === 'draw') {
-    const draw = el('select');
+    const draw = selectOf(data.drawDates.map((d) => [d.date, `${formatDrawDate(d.date)} (${d.grids})`]), s.draw);
     if (!data.drawDates.length) draw.append(el('option', '', 'Aucune grille pour ce jeu'));
-    for (const d of data.drawDates) {
-      const option = el('option', '', `${drawDateLabel(d.date)} (${d.grids})`);
-      option.value = d.date;
-      option.selected = d.date === s.draw;
-      draw.append(option);
-    }
     draw.disabled = !data.drawDates.length;
     draw.addEventListener('change', () => {
       s.draw = draw.value;
@@ -486,9 +466,9 @@ async function renderNumbers() {
   }
 
   const scope = data.drawDate
-    ? `pour le tirage du ${drawDateLabel(data.drawDate)}`
+    ? `pour le tirage du ${formatDrawDate(data.drawDate)}`
     : data.from === data.to
-      ? `créées le ${drawDateLabel(data.from)}`
+      ? `créées le ${formatDrawDate(data.from)}`
       : `créées du ${shortDate(data.from)} ${data.from.slice(0, 4)} au ${shortDate(data.to)} ${data.to.slice(0, 4)}`;
   const [numbersPhase, bonusPhase] = rules.phases;
   view.replaceChildren(

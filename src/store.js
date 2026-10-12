@@ -7,9 +7,9 @@ import { DEFAULT_GAME, GAMES, getGame, nextDrawDate, todayInFrance } from './gam
 
 export const GRID_LIFETIME_MS = 30 * 24 * 60 * 60 * 1000;
 export const SESSION_LIFETIME_MS = 30 * 24 * 60 * 60 * 1000;
-// Statistiques anonymes (numéros joués, fréquentation) : gardées 3 ans.
 // Pseudo d'un compte quand ni les parties ni le service de connexion n'en donnent un.
 export const DEFAULT_NAME = 'Joueur';
+// Statistiques anonymes (numéros joués, fréquentation) : gardées 3 ans.
 export const STATS_LIFETIME_MS = 3 * 365 * 24 * 60 * 60 * 1000;
 // Code de connexion envoyé par email, et lien de vérification d'une adresse.
 export const LOGIN_CODE_LIFETIME_MS = 15 * 60 * 1000;
@@ -113,7 +113,7 @@ function statsDrawDate(gameType, drawDate, createdAt) {
   return drawDate ?? nextDrawDate(getGame(gameType) ?? GAMES[DEFAULT_GAME], new Date(createdAt));
 }
 
-function gridStatsInsert({ gameType = 'loto', numbers, bonus, players, rounds, drawDate = null }, createdAt) {
+function gridStatsInsert({ gameType = DEFAULT_GAME, numbers, bonus, players, rounds, drawDate = null }, createdAt) {
   return {
     sql: `INSERT INTO grid_stats (created_at, day, game_type, draw_date, stats_draw_date, numbers, bonus, players, rounds)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -134,6 +134,8 @@ export async function openStore({ url, authToken, file = ':memory:', superadminE
   const run = (sql, ...args) => db.execute({ sql, args });
   const first = async (sql, ...args) => (await run(sql, ...args)).rows[0];
   const changes = (result) => Number(result.rowsAffected);
+  const columnsOf = async (table) => new Set((await run(`PRAGMA table_info(${table})`)).rows.map((c) => c.name));
+  const tableExists = async (name) => Boolean(await first("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?", name));
 
   await run(`
     CREATE TABLE IF NOT EXISTS grids (
@@ -148,11 +150,11 @@ export async function openStore({ url, authToken, file = ':memory:', superadminE
     )
   `);
   // Colonnes ajoutées avec l'Euromillions et EuroDreams : les grilles plus anciennes sont des grilles de Loto.
-  const columns = new Set((await run('PRAGMA table_info(grids)')).rows.map((c) => c.name));
+  const columns = await columnsOf('grids');
   if (!columns.has('game_type')) await run("ALTER TABLE grids ADD COLUMN game_type TEXT NOT NULL DEFAULT 'loto'");
   if (!columns.has('bonus')) await run('ALTER TABLE grids ADD COLUMN bonus TEXT');
-  const loginsExisted = Boolean(await first("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'user_logins'"));
-  const gridStatsExisted = Boolean(await first("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'grid_stats'"));
+  const loginsExisted = await tableExists('user_logins');
+  const gridStatsExisted = await tableExists('grid_stats');
   // Comptes : pseudo et email (jamais le vrai nom). L'adresse email vient toujours d'un fournisseur
   // de connexion et identifie le compte : un seul compte peut l'avoir. `email_verified` : adresse
   // vérifiée par le fournisseur, par un code ou par un lien envoyé à cette adresse.
@@ -239,7 +241,7 @@ export async function openStore({ url, authToken, file = ':memory:', superadminE
     ],
     'write',
   );
-  const userColumns = new Set((await run('PRAGMA table_info(users)')).rows.map((c) => c.name));
+  const userColumns = await columnsOf('users');
   if (!userColumns.has('is_admin')) await run('ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0');
   if (!userColumns.has('last_login_at')) await run('ALTER TABLE users ADD COLUMN last_login_at INTEGER');
   // Grilles reprises avec un compte à l'adresse non vérifiée : le joueur est invité à les relire.
@@ -254,7 +256,7 @@ export async function openStore({ url, authToken, file = ':memory:', superadminE
     if (rows.length) await db.batch(rows.map((row) => gridStatsInsert(toGrid(row), Number(row.created_at))), 'write');
   }
   // Tirage compté dans les statistiques, calculé pour les grilles enregistrées avant son ajout.
-  const statsColumns = new Set((await run('PRAGMA table_info(grid_stats)')).rows.map((c) => c.name));
+  const statsColumns = await columnsOf('grid_stats');
   if (!statsColumns.has('stats_draw_date')) await run('ALTER TABLE grid_stats ADD COLUMN stats_draw_date TEXT');
   const { rows: undated } = await run('SELECT id, game_type, draw_date, created_at FROM grid_stats WHERE stats_draw_date IS NULL');
   if (undated.length) {
@@ -306,7 +308,7 @@ export async function openStore({ url, authToken, file = ':memory:', superadminE
   return {
     // `bonus` : numéros complémentaires (numéro chance, étoiles ou numéro Dream).
     // `participants` : jeton et pseudo de chaque joueur, pour rattacher plus tard la grille à son compte.
-    async saveGrid({ id, gameType = 'loto', numbers, bonus, players, rounds, drawDate = null, participants = [] }, now = Date.now()) {
+    async saveGrid({ id, gameType = DEFAULT_GAME, numbers, bonus, players, rounds, drawDate = null, participants = [] }, now = Date.now()) {
       await db.batch(
         [
           {
@@ -400,11 +402,11 @@ export async function openStore({ url, authToken, file = ':memory:', superadminE
       );
       return { ...(await selectUser(userId)), created };
     },
-    // Pseudo et accord d'envoi des résultats (qui demande une adresse vérifiée). L'adresse, elle,
-    // vient toujours du fournisseur de connexion.
     async dismissGridsReview(id) {
       await run('UPDATE users SET review_grids = 0 WHERE id = ?', id);
     },
+    // Pseudo et accord d'envoi des résultats (qui demande une adresse vérifiée). L'adresse, elle,
+    // vient toujours du fournisseur de connexion.
     async updateUser(id, { name, emailConsent }) {
       await run(
         'UPDATE users SET name = ?, email_consent = CASE WHEN email IS NOT NULL AND email_verified = 1 THEN ? ELSE 0 END WHERE id = ?',

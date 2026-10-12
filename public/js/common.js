@@ -1,15 +1,36 @@
 import { GAMES, DEFAULT_GAME, getGame } from './games.js';
 
+// Pseudo des parties, gardé par le navigateur.
+export const NAME_KEY = 'coloto:name';
+
+// Jeton de participation à chaque partie jouée sur cet appareil.
+const TOKEN_PREFIX = 'coloto:token:';
+
 export function saveToken(roomId, token) {
-  localStorage.setItem(`coloto:token:${roomId}`, token);
+  localStorage.setItem(TOKEN_PREFIX + roomId, token);
 }
 
 export function loadToken(roomId) {
-  return localStorage.getItem(`coloto:token:${roomId}`);
+  return localStorage.getItem(TOKEN_PREFIX + roomId);
 }
 
 export function forgetToken(roomId) {
-  localStorage.removeItem(`coloto:token:${roomId}`);
+  localStorage.removeItem(TOKEN_PREFIX + roomId);
+}
+
+// Les parties qui ont un jeton sur cet appareil.
+export function storedTokenIds() {
+  return Object.keys(localStorage)
+    .filter((key) => key.startsWith(TOKEN_PREFIX))
+    .map((key) => key.slice(TOKEN_PREFIX.length));
+}
+
+// Construction nœud par nœud : aucune donnée reçue n'est interprétée comme du HTML.
+export function el(tag, className, ...children) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  node.append(...children);
+  return node;
 }
 
 export function escapeHtml(text) {
@@ -18,6 +39,11 @@ export function escapeHtml(text) {
 
 export function formatDrawDate(value) {
   return new Date(`${value}T12:00:00Z`).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
+}
+
+// « 12 octobre 2026 », pour un instant (date de création d'une grille…).
+export function formatDay(value) {
+  return new Date(value).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
 }
 
 export function ball(number, extra = '') {
@@ -42,6 +68,11 @@ export function describeGame(rules) {
   const [numbers, bonus] = rules.phases;
   const bonusLabel = bonus.count === 1 ? 'le ' + bonus.one : countLabel(bonus);
   return `${countLabel(numbers)}, puis ${bonusLabel}`;
+}
+
+// Mêmes boules que gridBalls, en nœuds.
+export function ballNodes(numbers, bonus) {
+  return [...numbers.map((n) => el('span', 'ball validated', String(n))), ...bonus.map((n) => el('span', 'ball bonus', String(n)))];
 }
 
 export function gridBalls(numbers, bonus) {

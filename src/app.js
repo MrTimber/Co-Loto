@@ -33,6 +33,13 @@ function isOnline(room, playerId) {
   return false;
 }
 
+// Jeton et pseudo de chaque joueur encore présent dans le salon.
+function participantsOf(room) {
+  return [...room.tokens]
+    .map(([token, playerId]) => ({ token, name: findPlayer(room.game, playerId)?.name }))
+    .filter((p) => p.name);
+}
+
 function broadcast(room) {
   for (const socket of room.sockets) {
     const view = viewFor(room.game, socket.data.playerId);
@@ -94,7 +101,7 @@ export function createApp({
         players: game.players.length,
         maxPlayers: game.maxPlayers,
         drawDate: game.drawDate,
-        participants: [...room.tokens].map(([token, playerId]) => ({ token, name: findPlayer(game, playerId)?.name })).filter((p) => p.name),
+        participants: participantsOf(room),
       });
     }
     res.json(lobbies);
@@ -188,7 +195,7 @@ export function createApp({
         players: game.players.map((p) => p.name),
         rounds: game.rounds.length,
         drawDate: game.drawDate,
-        participants: [...room.tokens].map(([token, playerId]) => ({ token, name: findPlayer(game, playerId)?.name })).filter((p) => p.name),
+        participants: participantsOf(room),
       }).catch((err) => console.error('Enregistrement de la grille impossible :', err.message));
       for (const timer of room.offlineTimers.values()) clearTimeout(timer);
       room.offlineTimers.clear();

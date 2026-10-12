@@ -1,4 +1,5 @@
-import { getAccount, providerButtons, el } from './account.js';
+import { getAccount, providerButtons } from './account.js';
+import { el } from './common.js';
 
 const params = new URLSearchParams(location.search);
 const retour = params.get('retour') || '/mon-espace';
