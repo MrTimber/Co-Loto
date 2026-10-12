@@ -23,7 +23,8 @@
   --radius: 12px;
   /* Largeur maximale du site : au-delà, bandes neutres sur les côtés. */
   --page-max: 1200px;
-  --page-side: color-mix(in srgb, var(--brand) 12%, #fff);
+  --page-side: #fff;
+  --header-bg: color-mix(in srgb, var(--brand) 12%, #fff);
   color-scheme: light dark;
 }
 
@@ -45,7 +46,8 @@
     --bonus-text: #fff;
     --picked: #263045;
     --danger: #f97066;
-    --page-side: color-mix(in srgb, var(--brand) 14%, #0f1420);
+    --page-side: #090c13;
+    --header-bg: color-mix(in srgb, var(--brand) 14%, #0f1420);
   }
 }
 
@@ -92,7 +94,7 @@ h2 { font-size: 1.15rem; margin: 0 0 .75rem; }
   align-items: center;
   padding: .75rem 1rem;
   border-bottom: 1px solid var(--border);
-  background: var(--surface);
+  background: var(--header-bg);
 }
 .logo { grid-area: 1 / 1; justify-self: start; display: flex; }
 .logo:not([href]) { cursor: default; }
