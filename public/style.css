@@ -21,6 +21,9 @@
   --picked: #e5e9f2;
   --danger: #b42318;
   --radius: 12px;
+  /* Largeur maximale du site : au-delà, bandes neutres sur les côtés. */
+  --page-max: 1200px;
+  --page-side: #e4e7ec;
   color-scheme: light dark;
 }
 
@@ -42,6 +45,7 @@
     --bonus-text: #fff;
     --picked: #263045;
     --danger: #f97066;
+    --page-side: #232936;
   }
 }
 
@@ -58,8 +62,14 @@ body[data-game] { --on-theme: #fff; }
 
 * { box-sizing: border-box; }
 
+/* Le fond de html empêche celui du body (couleur du jeu) de s'étendre à toute la fenêtre. */
+html { background: var(--page-side); }
+
 body {
-  margin: 0;
+  width: 100%;
+  max-width: var(--page-max);
+  margin: 0 auto;
+  box-shadow: 0 0 24px rgb(0 0 0 / .08);
   min-height: 100vh;
   display: flex;
   flex-direction: column;
