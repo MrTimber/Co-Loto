@@ -3,7 +3,7 @@ import { createClient } from '@libsql/client';
 import { createHash, randomBytes, randomInt, randomUUID } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
-import { todayInFrance } from './games.js';
+import { DEFAULT_GAME, GAMES, getGame, nextDrawDate, todayInFrance } from './games.js';
 
 export const GRID_LIFETIME_MS = 30 * 24 * 60 * 60 * 1000;
 export const SESSION_LIFETIME_MS = 30 * 24 * 60 * 60 * 1000;
@@ -107,11 +107,17 @@ async function mergeAccountsByEmail(db, firstRun) {
   await db.execute('CREATE UNIQUE INDEX IF NOT EXISTS users_email ON users (lower(email))');
 }
 
+// Tirage compté dans les statistiques : la date de tirage prévue, sinon le prochain tirage au
+// moment où la grille est terminée.
+function statsDrawDate(gameType, drawDate, createdAt) {
+  return drawDate ?? nextDrawDate(getGame(gameType) ?? GAMES[DEFAULT_GAME], new Date(createdAt));
+}
+
 function gridStatsInsert({ gameType = 'loto', numbers, bonus, players, rounds, drawDate = null }, createdAt) {
   return {
-    sql: `INSERT INTO grid_stats (created_at, day, game_type, draw_date, numbers, bonus, players, rounds)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    args: [createdAt, dayOf(createdAt), gameType, drawDate, JSON.stringify(numbers), JSON.stringify(bonus), players.length, rounds],
+    sql: `INSERT INTO grid_stats (created_at, day, game_type, draw_date, stats_draw_date, numbers, bonus, players, rounds)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    args: [createdAt, dayOf(createdAt), gameType, drawDate, statsDrawDate(gameType, drawDate, createdAt), JSON.stringify(numbers), JSON.stringify(bonus), players.length, rounds],
   };
 }
 
@@ -198,20 +204,21 @@ export async function openStore({ url, authToken, file = ':memory:', superadminE
       )`,
       'CREATE INDEX IF NOT EXISTS grid_players_user ON grid_players (user_id)',
       // Numéros de chaque grille terminée, sans pseudo ni lien vers les joueurs ou la grille :
-      // gardés 3 ans pour les statistiques. `day` : jour de création (heure de Paris).
+      // gardés 3 ans pour les statistiques. `day` : jour de création (heure de Paris). `draw_date` :
+      // date de tirage prévue (facultative) ; `stats_draw_date` : tirage compté dans les statistiques.
       `CREATE TABLE IF NOT EXISTS grid_stats (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         created_at INTEGER NOT NULL,
         day TEXT NOT NULL,
         game_type TEXT NOT NULL,
         draw_date TEXT,
+        stats_draw_date TEXT,
         numbers TEXT NOT NULL,
         bonus TEXT NOT NULL,
         players INTEGER NOT NULL,
         rounds INTEGER NOT NULL
       )`,
       'CREATE INDEX IF NOT EXISTS grid_stats_day ON grid_stats (game_type, day)',
-      'CREATE INDEX IF NOT EXISTS grid_stats_draw ON grid_stats (game_type, draw_date)',
       // Compteurs quotidiens de fréquentation et d'activité (pages vues, visiteurs, salons créés…).
       `CREATE TABLE IF NOT EXISTS stats_counters (
         day TEXT NOT NULL,
@@ -246,6 +253,21 @@ export async function openStore({ url, authToken, file = ':memory:', superadminE
     const { rows } = await run('SELECT * FROM grids');
     if (rows.length) await db.batch(rows.map((row) => gridStatsInsert(toGrid(row), Number(row.created_at))), 'write');
   }
+  // Tirage compté dans les statistiques, calculé pour les grilles enregistrées avant son ajout.
+  const statsColumns = new Set((await run('PRAGMA table_info(grid_stats)')).rows.map((c) => c.name));
+  if (!statsColumns.has('stats_draw_date')) await run('ALTER TABLE grid_stats ADD COLUMN stats_draw_date TEXT');
+  const { rows: undated } = await run('SELECT id, game_type, draw_date, created_at FROM grid_stats WHERE stats_draw_date IS NULL');
+  if (undated.length) {
+    await db.batch(
+      undated.map((r) => ({
+        sql: 'UPDATE grid_stats SET stats_draw_date = ? WHERE id = ?',
+        args: [statsDrawDate(r.game_type, r.draw_date, Number(r.created_at)), r.id],
+      })),
+      'write',
+    );
+  }
+  await run('DROP INDEX IF EXISTS grid_stats_draw');
+  await run('CREATE INDEX IF NOT EXISTS grid_stats_by_draw ON grid_stats (game_type, stats_draw_date)');
 
   // Le rôle est calculé à chaque lecture : le superadmin suit la variable d'environnement.
   // Le premier paramètre de chaque requête qui lit USER_COLUMNS est donc l'adresse du superadmin.
@@ -540,11 +562,11 @@ export async function openStore({ url, authToken, file = ':memory:', superadminE
     // Numéros des grilles d'un jeu, créées du jour `from` au jour `to`, ou pour le tirage `drawDate`.
     async gridStats({ gameType, from, to, drawDate }) {
       const { rows } = drawDate
-        ? await run('SELECT * FROM grid_stats WHERE game_type = ? AND draw_date = ?', gameType, drawDate)
+        ? await run('SELECT * FROM grid_stats WHERE game_type = ? AND stats_draw_date = ?', gameType, drawDate)
         : await run('SELECT * FROM grid_stats WHERE game_type = ? AND day >= ? AND day <= ?', gameType, from, to);
       return rows.map((r) => ({
         day: r.day,
-        drawDate: r.draw_date,
+        drawDate: r.stats_draw_date,
         numbers: JSON.parse(r.numbers),
         bonus: JSON.parse(r.bonus),
         players: Number(r.players),
@@ -554,10 +576,10 @@ export async function openStore({ url, authToken, file = ':memory:', superadminE
     // Dates de tirage qui ont au moins une grille, la plus récente d'abord.
     async statsDrawDates(gameType) {
       const { rows } = await run(
-        'SELECT draw_date, COUNT(*) AS grids FROM grid_stats WHERE game_type = ? AND draw_date IS NOT NULL GROUP BY draw_date ORDER BY draw_date DESC',
+        'SELECT stats_draw_date, COUNT(*) AS grids FROM grid_stats WHERE game_type = ? GROUP BY stats_draw_date ORDER BY stats_draw_date DESC',
         gameType,
       );
-      return rows.map((r) => ({ date: r.draw_date, grids: Number(r.grids) }));
+      return rows.map((r) => ({ date: r.stats_draw_date, grids: Number(r.grids) }));
     },
     async statsSummary(now = Date.now()) {
       const sinceDay = dayOf(now - 29 * 86_400_000);

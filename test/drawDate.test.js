@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { validateDrawDate } from '../src/drawDate.js';
-import { GAMES, upcomingDrawDates } from '../src/games.js';
+import { GAMES, nextDrawDate, upcomingDrawDates } from '../src/games.js';
 
 const now = new Date('2026-10-09T10:00:00Z'); // un vendredi
 
@@ -45,4 +45,14 @@ test("« aujourd'hui » s'entend à l'heure de Paris", () => {
   const tuesdayNightInParis = new Date('2026-10-12T22:30:00Z'); // mardi 13 octobre, 0 h 30 à Paris
   assert.equal(upcomingDrawDates(GAMES.euromillions, tuesdayNightInParis)[0], '2026-10-13');
   assert.throws(() => validateDrawDate('2026-10-12', tuesdayNightInParis), /passée/);
+});
+
+test('prochain tirage : celui du jour jusqu’à la fin des prises de jeu, à l’heure de Paris', () => {
+  const paris = (iso) => new Date(iso); // heure d'été : Paris = UTC + 2
+  assert.equal(nextDrawDate(GAMES.loto, paris('2026-10-12T18:14:00Z')), '2026-10-12'); // lundi 20 h 14
+  assert.equal(nextDrawDate(GAMES.loto, paris('2026-10-12T18:15:00Z')), '2026-10-14'); // lundi 20 h 15
+  assert.equal(nextDrawDate(GAMES.eurodreams, paris('2026-10-12T17:59:00Z')), '2026-10-12');
+  assert.equal(nextDrawDate(GAMES.eurodreams, paris('2026-10-12T18:00:00Z')), '2026-10-15');
+  assert.equal(nextDrawDate(GAMES.euromillions, paris('2026-10-12T10:00:00Z')), '2026-10-13');
+  assert.equal(nextDrawDate(GAMES.loto, paris('2026-10-10T22:30:00Z')), '2026-10-12'); // samedi minuit et demi à Paris : dimanche
 });

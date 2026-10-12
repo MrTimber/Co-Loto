@@ -114,7 +114,7 @@ Pages :
 
 **Mesure d'audience sans outil externe.** Le serveur compte lui-même les pages ouvertes par un navigateur (les robots et le contrôle de santé de Render sont ignorés), par jour : page, type d'appareil, site d'origine. Un visiteur est compté une fois par jour grâce à une empreinte de son adresse IP et de son navigateur, mélangée à un sel tiré au sort chaque jour ; sels et empreintes sont effacés le lendemain. Aucun cookie, aucune adresse IP n'est enregistrée, et les visites d'un jour à l'autre ne peuvent pas être reliées.
 
-**Statistiques des numéros.** À la fin de chaque partie, les numéros de la grille sont aussi copiés, avec le jeu, la date de tirage, le nombre de joueurs et de tours, mais **sans les pseudos ni aucun lien vers la grille ou les joueurs**. Cette copie est gardée 3 ans, alors que la grille et ses joueurs sont effacés au bout de 30 jours. Les compteurs de fréquentation sont aussi gardés 3 ans.
+**Statistiques des numéros.** À la fin de chaque partie, les numéros de la grille sont aussi copiés, avec le jeu, la date de tirage, le nombre de joueurs et de tours, mais **sans les pseudos ni aucun lien vers la grille ou les joueurs**. Cette copie est gardée 3 ans, alors que la grille et ses joueurs sont effacés au bout de 30 jours. Chaque grille y est comptée pour un tirage : la date de tirage prévue si le créateur l'a indiquée, sinon le prochain tirage du jeu au moment où la grille est terminée (celui du jour jusqu'à la fin des prises de jeu : 20 h 15 pour le Loto et l'Euromillions, 20 h pour EuroDreams, heure de Paris). Les compteurs de fréquentation sont aussi gardés 3 ans.
 
 ## Stack technique
 
