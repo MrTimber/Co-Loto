@@ -6,14 +6,6 @@ export const ADMIN_PAGES = [
   ['/admin/numeros', 'Numéros joués'],
 ];
 
-export function adminLinks(el) {
-  return [
-    el('p', 'menu-heading', 'Administration'),
-    ...ADMIN_PAGES.map(([href, label]) => {
-      const link = el('a', '', label);
-      link.href = href;
-      if (location.pathname === href) link.setAttribute('aria-current', 'page');
-      return link;
-    }),
-  ];
+export function adminLinks(el, pageLink) {
+  return [el('p', 'menu-heading', 'Administration'), ...ADMIN_PAGES.map(([href, label]) => pageLink(href, label))];
 }
