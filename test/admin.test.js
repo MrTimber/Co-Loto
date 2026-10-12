@@ -121,6 +121,7 @@ test('mise à niveau : un seul compte par adresse', async () => {
   });
   assert.equal(users.find((u) => u.id === 'u3').email, 'seule@example.com'); // gardée, non vérifiée
   assert.equal(users.find((u) => u.id === 'u3').emailVerified, false);
+  assert.equal(users.find((u) => u.id === 'u3').emailConsent, false); // accord retiré sans adresse vérifiée
   assert.equal((await store.upsertUser({ provider: 'github', providerId: 'h', name: 'x' })).id, 'u1');
   store.close();
   // Une seconde ouverture ne change plus rien.
