@@ -1,19 +1,29 @@
 // En-tête : lien « Se connecter » ou « Mon espace » (seulement si la connexion est proposée).
-// Une personne connectée a toujours le menu burger, terminé par « Se déconnecter » ; un administrateur
+// Une personne connectée a toujours le menu burger : « Accueil », « Mon espace », puis « Se déconnecter » ; un administrateur
 // y trouve ses entrées en plus (chargées depuis l'espace d'administration). Pour les visiteurs, le lien
 // n'est regroupé dans un menu burger que sur petit écran.
 import { getAccount, claimStoredGrids, currentPath, el } from './account.js';
 
 const header = document.querySelector('.site-header');
+const here = location.pathname.replace(/\/+$/, '') || '/';
+
+// La page où l'on est déjà n'est pas un lien : le logo sur l'accueil, l'entrée surlignée du menu.
+function pageLink(href, label) {
+  const link = el('a', '', label);
+  if (here === href) link.setAttribute('aria-current', 'page');
+  else link.href = href;
+  return link;
+}
+
+const logo = header?.querySelector('.logo');
+if (logo && here === '/') logo.removeAttribute('href');
+
 const { user, providers } = await getAccount();
 if (header && (user || providers.length)) {
   const links = el('div', 'account-links');
   links.id = 'account-menu';
   if (user) {
-    const link = el('a', '', 'Mon espace');
-    link.href = '/mon-espace';
-    if (location.pathname === link.pathname) link.setAttribute('aria-current', 'page');
-    links.append(link);
+    links.append(pageLink('/', 'Accueil'), pageLink('/mon-espace', 'Mon espace'));
   } else if (location.pathname !== '/connexion') {
     const link = el('a', '', 'Se connecter');
     link.href = `/connexion?retour=${encodeURIComponent(currentPath())}`;
@@ -22,7 +32,7 @@ if (header && (user || providers.length)) {
   if (user?.admin) {
     try {
       const { adminLinks } = await import('/admin/static/menu.js');
-      links.append(...adminLinks(el));
+      links.append(...adminLinks(el, pageLink));
     } catch {
       // rôle retiré entre-temps : menu habituel
     }

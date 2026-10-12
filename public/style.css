@@ -85,6 +85,7 @@ h2 { font-size: 1.15rem; margin: 0 0 .75rem; }
   background: var(--surface);
 }
 .logo { grid-area: 1 / 1; justify-self: start; display: flex; }
+.logo:not([href]) { cursor: default; }
 .logo img { display: block; height: 48px; width: auto; }
 
 /* Écran d'accueil (voir js/splash.js) */
@@ -366,14 +367,15 @@ form label.game-option {
   right: .5rem;
   z-index: 20;
   min-width: 12rem;
-  padding: .25rem 0;
+  padding: 0;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   box-shadow: 0 8px 24px rgb(0 0 0 / .15);
+  overflow: hidden; /* le surlignement suit les coins arrondis */
 }
 .account.menu.open .account-links a { padding: .75rem 1rem; text-decoration: none; }
-.account.menu.open .account-links a[aria-current=page] { background: var(--accent-soft); }
+.account.menu.open .account-links a[aria-current=page] { background: var(--accent-soft); cursor: default; }
 .account-links .menu-logout {
   margin-top: .25rem;
   padding: .75rem 1rem;
