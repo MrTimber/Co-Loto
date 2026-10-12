@@ -24,7 +24,7 @@
   /* Largeur maximale du site : au-delà, bandes neutres sur les côtés. */
   --page-max: 1200px;
   --page-side: #fff;
-  --header-bg: color-mix(in srgb, var(--brand) 12%, #fff);
+  --page-shadow: rgb(16 24 40 / .35);
   color-scheme: light dark;
 }
 
@@ -47,7 +47,7 @@
     --picked: #263045;
     --danger: #f97066;
     --page-side: #090c13;
-    --header-bg: color-mix(in srgb, var(--brand) 14%, #0f1420);
+    --page-shadow: rgb(0 0 0 / .7);
   }
 }
 
@@ -71,7 +71,8 @@ body {
   width: 100%;
   max-width: var(--page-max);
   margin: 0 auto;
-  box-shadow: 0 0 24px rgb(0 0 0 / .08);
+  /* Ombre sur les seuls côtés, pour détacher la colonne des bandes latérales. */
+  box-shadow: -8px 0 16px -6px var(--page-shadow), 8px 0 16px -6px var(--page-shadow);
   min-height: 100vh;
   display: flex;
   flex-direction: column;
@@ -94,7 +95,7 @@ h2 { font-size: 1.15rem; margin: 0 0 .75rem; }
   align-items: center;
   padding: .75rem 1rem;
   border-bottom: 1px solid var(--border);
-  background: var(--header-bg);
+  background: var(--surface);
 }
 .logo { grid-area: 1 / 1; justify-self: start; display: flex; }
 .logo:not([href]) { cursor: default; }
