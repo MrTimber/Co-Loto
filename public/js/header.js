@@ -5,7 +5,7 @@
 import { getAccount, claimStoredGrids, currentPath, el } from './account.js';
 
 const header = document.querySelector('.site-header');
-const here = location.pathname.replace(/\/+$/, '') || '/';
+const here = location.pathname.replace(/\/$/, '') || '/';
 
 // La page où l'on est déjà n'est pas un lien : le logo sur l'accueil, l'entrée surlignée du menu.
 function pageLink(href, label) {
