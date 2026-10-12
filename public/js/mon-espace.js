@@ -87,6 +87,7 @@ function profileForm(user, providers, canVerify) {
     field('Pseudo', name),
     emailInfo(user, providers, canVerify),
     el('label', 'inline', consent, ' M\u2019envoyer par email le résultat de mes grilles qui ont une date de tirage'),
+    user.emailVerified ? '' : el('p', 'small muted', 'Option disponible une fois votre adresse email vérifiée.'),
     el('p', 'small muted', 'L\u2019envoi des résultats arrivera dans une prochaine version. Vous pouvez retirer cet accord à tout moment.'),
     el('div', 'actions', save, status),
   );
