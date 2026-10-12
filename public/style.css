@@ -162,6 +162,10 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .players.compact li { border: 0; padding: 0; }
 .tag { font-size: .75rem; padding: .05rem .45rem; border-radius: 99px; background: var(--picked); color: var(--muted); }
 .tag.warn { background: var(--pending-soft); color: var(--text); }
+.tag.ok { background: var(--accent-soft); color: var(--text); }
+.banner.warn { background: var(--pending-soft); }
+div.banner > p { margin: 0 0 .5rem; }
+div.banner > .actions { margin: 0; }
 .pick-status { font-size: .85rem; color: var(--muted); }
 .pick-status.done { color: var(--accent); font-weight: 600; }
 
@@ -322,30 +326,39 @@ form label.game-option {
 /* Compte facultatif */
 .account { display: flex; gap: 1rem; align-items: center; font-weight: 600; }
 .account a { color: var(--brand); }
-/* Menu burger sur petit écran : les liens du compte s'ouvrent sous l'en-tête. */
+/* Menu burger (classe « menu », posée par js/header.js) : sur petit écran, et toujours pour un administrateur.
+   Les liens du compte s'ouvrent alors sous l'en-tête. */
 .menu-toggle { display: none; padding: .45rem; border: 0; background: none; color: var(--brand); line-height: 0; }
 .menu-toggle svg { width: 28px; height: 28px; }
-@media (max-width: 600px) {
-  .menu-toggle { display: inline-block; }
-  .account-links { display: none; }
-  .account.open .account-links {
-    display: flex;
-    flex-direction: column;
-    position: absolute;
-    top: 100%;
-    right: .5rem;
-    z-index: 20;
-    min-width: 12rem;
-    padding: .25rem 0;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    box-shadow: 0 8px 24px rgb(0 0 0 / .15);
-  }
-  .account.open .account-links a { padding: .75rem 1rem; text-decoration: none; }
+.account-links { display: flex; gap: 1rem; }
+.account.menu .menu-toggle { display: inline-block; }
+.account.menu .account-links { display: none; }
+.account.menu.open .account-links {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  position: absolute;
+  top: 100%;
+  right: .5rem;
+  z-index: 20;
+  min-width: 12rem;
+  padding: .25rem 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgb(0 0 0 / .15);
 }
-@media (min-width: 601px) {
-  .account-links { display: flex; gap: 1rem; }
+.account.menu.open .account-links a { padding: .75rem 1rem; text-decoration: none; }
+.account.menu.open .account-links a[aria-current=page] { background: var(--accent-soft); }
+.account-links .menu-heading {
+  margin: .25rem 0 0;
+  padding: .6rem 1rem .25rem;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: .75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .04em;
 }
 .providers { display: grid; gap: .5rem; margin: 1rem 0; }
 .provider { text-align: center; font-weight: 600; }
@@ -364,6 +377,10 @@ form label.game-option {
 .account-offer > :last-child { margin-bottom: 0; }
 .profile { border-top: 1px solid var(--border); padding-top: 1rem; margin-bottom: 1rem; }
 .profile label.inline { display: flex; gap: .5rem; align-items: flex-start; }
+.profile .field { margin-bottom: 1rem; }
+.profile .field p { margin: 0; }
+.profile .field-label { font-weight: 600; }
+.profile .field-value { margin: .3rem 0 .15rem; overflow-wrap: anywhere; }
 .profile input[type=checkbox] { width: auto; margin-top: .3rem; flex: none; }
 .danger-zone { margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--border); text-align: center; }
 button.link.danger { color: var(--danger); }

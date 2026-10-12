@@ -1,5 +1,6 @@
 // En-tête : lien « Se connecter » ou « Mon espace » (seulement si la connexion est proposée).
-// Sur petit écran, les liens sont regroupés dans un menu burger.
+// Sur petit écran, les liens sont regroupés dans un menu burger ; un administrateur a toujours
+// le menu burger, avec ses entrées en plus (chargées depuis l'espace d'administration).
 import { getAccount, claimStoredGrids, currentPath, el } from './account.js';
 
 const header = document.querySelector('.site-header');
@@ -16,6 +17,14 @@ if (header && (user || providers.length)) {
     link.href = `/connexion?retour=${encodeURIComponent(currentPath())}`;
     links.append(link);
   }
+  if (user?.admin) {
+    try {
+      const { adminLinks } = await import('/admin/static/menu.js');
+      links.append(...adminLinks(el));
+    } catch {
+      // rôle retiré entre-temps : menu habituel
+    }
+  }
   if (links.childElementCount) {
     const nav = el('nav', 'account');
     nav.setAttribute('aria-label', 'Compte');
@@ -30,6 +39,13 @@ if (header && (user || providers.length)) {
       nav.classList.toggle('open', open);
       toggle.setAttribute('aria-expanded', String(open));
     };
+    const small = matchMedia('(max-width: 600px)');
+    const useMenu = () => {
+      nav.classList.toggle('menu', Boolean(user?.admin) || small.matches);
+      if (!nav.classList.contains('menu')) setOpen(false);
+    };
+    useMenu();
+    small.addEventListener('change', useMenu);
     toggle.addEventListener('click', () => setOpen(!nav.classList.contains('open')));
     document.addEventListener('click', (event) => {
       if (!nav.contains(event.target)) setOpen(false);

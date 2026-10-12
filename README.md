@@ -59,7 +59,7 @@ Le jeu est choisi à la création du salon :
 
 - Les joueurs jouent la grille co-créée comme ils le souhaitent : en point de vente, sur le site de la FDJ, chacun de leur côté, ou ensemble en partageant les gains.
 - La grille reste consultable **30 jours** après sa création grâce à l'**URL unique** de la partie (`/grille/...`), que l'on peut copier ou partager depuis l'écran de fin.
-- Un joueur connecté retrouve toutes ses grilles dans **« Mon espace »**, où il peut aussi modifier son pseudo et son adresse email, accepter de recevoir les résultats par email, et supprimer son compte. Un joueur qui a joué sans compte se voit proposer, à la fin de la partie, de se connecter : la grille qu'il vient de co-créer est alors ajoutée à son espace.
+- Un joueur connecté retrouve toutes ses grilles dans **« Mon espace »**, où il voit son adresse email, peut modifier son pseudo, accepter de recevoir les résultats par email, et supprimer son compte. Un joueur qui a joué sans compte se voit proposer, à la fin de la partie, de se connecter : la grille qu'il vient de co-créer est alors ajoutée à son espace.
 - Si une date de tirage a été indiquée, elle s'affiche sur la page de la grille. À terme, le résultat de la grille sera évalué à la publication des résultats officiels et affiché sur cette page, et les joueurs qui ont renseigné leur adresse email et donné leur accord le **recevront par email** (pas encore disponible, voir « Prochaines étapes »).
 
 ## Fonctionnalités
@@ -76,6 +76,7 @@ Le jeu est choisi à la création du salon :
 - [x] Date de tirage optionnelle (limitée aux jours de tirage du jeu)
 - [x] Installable comme une application sur smartphone et tablette (PWA)
 - [x] Connexion facultative (Google, Microsoft, GitHub, Discord, Facebook) et page « Mon espace »
+- [x] Espace d'administration : utilisateurs et leurs grilles, fréquentation du site, numéros les plus joués
 - [ ] Vérification des résultats officiels à la date du tirage
 - [ ] Envoi des résultats par email (avec consentement)
 
@@ -94,6 +95,26 @@ Le jeu est choisi à la création du salon :
   Prix d'une grille simple, sans option : 2,20 € au Loto, 2,50 € à l'Euromillions (My Million compris) et à EuroDreams. Co-Loto informe seulement : rien n'est parié sur le site.
 - Les choix des numéros complémentaires repartent de zéro : ils sont indépendants des numéros déjà choisis.
 - Un joueur qui ferme sa page peut revenir avec le même lien (son navigateur garde un jeton). S'il reste déconnecté plus de 90 secondes, il quitte la partie et le tour continue sans lui. Si le créateur part, le rôle passe au joueur suivant.
+
+## Espace d'administration
+
+Réservé aux administrateurs, il est accessible depuis le menu burger, qu'un administrateur connecté voit toujours, même sur grand écran. Pour tout autre visiteur, ses pages, ses scripts et son API n'existent pas (erreur 404) et le menu reste le menu habituel.
+
+- **Superadmin** : il y en a un seul, désigné par la variable d'environnement `SUPERADMIN_EMAIL`. C'est le compte qui a cette adresse email (une adresse n'appartient qu'à un compte, voir « Comptes et adresses email »), **à condition qu'elle soit vérifiée**. Le compte n'a pas besoin d'exister à l'avance : il devient superadmin dès qu'il a cette adresse, vérifiée. Son rôle ne peut pas lui être retiré ; seul un changement de la variable désigne un autre superadmin.
+- **Administrateurs** : le superadmin nomme ou retire les administrateurs depuis la page « Utilisateurs ». Seul un compte dont l'adresse email est vérifiée peut être nommé, et un rôle n'est effectif qu'avec une adresse vérifiée.
+
+Pages :
+
+| Page | Contenu |
+|---|---|
+| `/admin` (tableau de bord) | Salons et joueurs en ce moment, visites, salons créés, grilles co-créées, comptes, grilles par jeu (joueurs et tours en moyenne) |
+| `/admin/utilisateurs` | Liste des comptes (pseudo, services de connexion liés, email, inscription, dernière connexion, rôle), recherche, grilles co-créées par chacun, nomination des administrateurs |
+| `/admin/frequentation` | Visiteurs et pages vues par jour (ou par semaine), grilles co-créées, pages les plus vues, sites d'origine, appareils, salons et grilles par jeu, inscriptions et connexions par fournisseur, sur 7 jours à 12 mois |
+| `/admin/numeros` | Numéros et numéros complémentaires les plus joués pour chaque jeu, sur une période d'un jour à un an, ou pour un tirage précis |
+
+**Mesure d'audience sans outil externe.** Le serveur compte lui-même les pages ouvertes par un navigateur (les robots et le contrôle de santé de Render sont ignorés), par jour : page, type d'appareil, site d'origine. Un visiteur est compté une fois par jour grâce à une empreinte de son adresse IP et de son navigateur, mélangée à un sel tiré au sort chaque jour ; sels et empreintes sont effacés le lendemain. Aucun cookie, aucune adresse IP n'est enregistrée, et les visites d'un jour à l'autre ne peuvent pas être reliées.
+
+**Statistiques des numéros.** À la fin de chaque partie, les numéros de la grille sont aussi copiés, avec le jeu, la date de tirage, le nombre de joueurs et de tours, mais **sans les pseudos ni aucun lien vers la grille ou les joueurs**. Cette copie est gardée 3 ans, alors que la grille et ses joueurs sont effacés au bout de 30 jours. Les compteurs de fréquentation sont aussi gardés 3 ans.
 
 ## Stack technique
 
@@ -118,11 +139,15 @@ src/game.js       Règles du jeu (sans réseau, entièrement testées)
 src/app.js        Serveur HTTP, API et événements temps réel
 src/store.js      Stockage des grilles terminées (30 jours), des comptes et des sessions (Turso ou fichier SQLite)
 src/auth.js       Connexion Google, Microsoft, GitHub, Discord, Facebook (OAuth 2.0 avec openid-client) et API « Mon espace »
+src/admin.js      Espace d'administration : pages et API réservées aux administrateurs
+src/mail.js       Envoi des emails (SMTP) : codes de connexion, vérification d'adresse
+src/stats.js      Mesure d'audience (pages vues, visiteurs du jour, appareils, sites d'origine)
 src/drawDate.js   Validation de la date de tirage
 src/index.js      Point d'entrée
 public/           Pages web (accueil, salon, grille, connexion, « Mon espace », confidentialité, page hors ligne)
 public/js/        Scripts des pages (modules JavaScript)
 public/sw.js      Service worker (installation, copie des fichiers statiques)
+admin/            Page et scripts de l'administration, servis seulement aux administrateurs
 test/             Tests automatisés
 ```
 
@@ -153,11 +178,15 @@ Variables d'environnement facultatives :
 | `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET` | Connexion avec Discord | _(désactivée)_ |
 | `FACEBOOK_CLIENT_ID`, `FACEBOOK_CLIENT_SECRET` | Connexion avec Facebook | _(désactivée)_ |
 | `PUBLIC_URL` | Adresse publique du site, pour les URL de rappel de la connexion : `https://co-loto.com` en production (indispensable avec un nom de domaine personnalisé) | `RENDER_EXTERNAL_URL` sur Render (adresse `…onrender.com`), sinon adresse de la requête |
+| `SUPERADMIN_EMAIL` | Adresse email du superadmin de l'espace d'administration (voir « Espace d'administration ») | _(aucun administrateur)_ |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`, `SMTP_SECURE` | Serveur SMTP pour envoyer les codes de connexion et les liens de vérification d'adresse (voir « Envoi des emails ») | _(emails affichés dans le journal en local, indisponibles sur Render)_ |
 | `AUTH_DEV_LOGIN` | `1` ajoute un « compte de test » sans fournisseur, pour le développement local (toujours ignoré sur Render) | _(désactivé)_ |
 
 Un fournisseur n'apparaît que si son identifiant **et** son secret sont définis. Sans aucun, le site fonctionne sans compte, comme avant.
 
 Pour essayer la connexion en local sans créer d'application OAuth : `AUTH_DEV_LOGIN=1 npm start`.
+
+Pour essayer l'espace d'administration en local : `AUTH_DEV_LOGIN=1 SUPERADMIN_EMAIL=moi@example.com npm start`, puis ouvrez `http://localhost:3000/auth/dev?nom=Moi&email=moi@example.com` (l'adresse du compte de test compte comme vérifiée ; ajoutez `&verifiee=0` pour simuler une adresse non vérifiée : le code ou le lien de vérification s'affiche alors dans le journal du serveur).
 
 Pour tester à plusieurs sur une seule machine, ouvrez le lien du salon dans une fenêtre de navigation privée.
 
@@ -254,7 +283,38 @@ Les aperçus de pull request ont une autre adresse : la connexion n'y fonctionne
 4. **Paramètres de l'app** > **Général** : renseignez l'URL de la politique de confidentialité (`https://co-loto.com/confidentialite`) et, pour la suppression des données, la même page (elle explique comment supprimer son compte depuis « Mon espace »). Copiez l'**ID de l'app** dans `FACEBOOK_CLIENT_ID` et la **clé secrète** dans `FACEBOOK_CLIENT_SECRET`.
 5. Passez l'app du mode **Développement** au mode **Live** (en haut de la page) : sans cela, seuls les administrateurs de l'app peuvent se connecter. Les autorisations `email` et `public_profile` ne demandent pas d'examen par Meta.
 
-Co-Loto demande à chaque service l'accès à l'adresse email, pour pouvoir envoyer plus tard les résultats des grilles (uniquement avec l'accord du joueur, donné dans « Mon espace »). Données conservées : le fournisseur, l'identifiant technique qu'il donne, l'adresse email et un pseudo (celui des parties, ou le pseudo GitHub ou Discord ; jamais les vrais nom et prénom). Le joueur modifie son pseudo et son email dans « Mon espace », et peut y supprimer son compte. Le détail est sur la page `/confidentialite` du site.
+Co-Loto demande à chaque service l'accès à l'adresse email, pour pouvoir envoyer plus tard les résultats des grilles (uniquement avec l'accord du joueur, donné dans « Mon espace »). Données conservées : le fournisseur, l'identifiant technique qu'il donne, l'adresse email et un pseudo (celui des parties, ou le pseudo GitHub ou Discord ; jamais les vrais nom et prénom). Le joueur modifie son pseudo dans « Mon espace », et peut y supprimer son compte.
+
+#### Comptes et adresses email
+
+- **Un compte par adresse.** L'adresse email vient toujours du service de connexion et identifie le compte : elle ne se modifie pas dans « Mon espace », qui l'affiche avec un badge **Vérifiée** ou **Non vérifiée**.
+- **Adresse vérifiée par le service** (Google ; Microsoft pour les comptes personnels ; GitHub et Discord quand l'adresse est confirmée chez eux ; Facebook) : si un compte a déjà cette adresse vérifiée, le service y est lié et le joueur arrive sur ce compte.
+- **Adresse non vérifiée par le service** (compte Microsoft professionnel, adresse non confirmée chez GitHub ou Discord) : si un compte a déjà cette adresse, un **code à 6 chiffres** est envoyé à cette adresse et le joueur doit le saisir pour terminer la connexion (15 minutes, 5 essais). Sinon, un compte est créé avec l'adresse marquée **Non vérifiée**.
+- **Vérifier son adresse** : dans « Mon espace », le bouton « Vérifier mon adresse » envoie un lien valable 24 heures. Une adresse vérifiée est nécessaire pour être administrateur et pour recevoir les résultats par email.
+- **Compte existant à l'adresse non vérifiée** : le joueur qui prouve posséder l'adresse (service qui l'a vérifiée, ou code reçu) arrive sur ce compte, dont l'adresse devient vérifiée et dont le pseudo devient le sien. Les autres services liés au compte et ses sessions ouvertes sont retirés : si quelqu'un avait utilisé cette adresse sans en être le propriétaire, il n'y a plus accès (il lui faudrait un service qui l'a vérifiée, ou le code). Si le compte a des grilles, « Mon espace » prévient que certaines peuvent ne pas être les siennes ; le bouton « Retirer » de chaque grille la détache du compte.
+- Un joueur connecté peut lier un autre service depuis « Mon espace » ; un compte sans adresse reçoit ainsi celle du service.
+- Au premier démarrage de cette version, les comptes qui partagent une adresse vérifiée sont fusionnés dans le plus ancien (services, grilles et rôle compris) ; les comptes qui avaient cette adresse sans l'avoir vérifiée y laissent leurs grilles (avec l'avertissement ci-dessus), mais pas leurs services ni leurs sessions. Si aucun compte ne l'a vérifiée, seul le plus ancien garde l'adresse.
+
+#### Envoi des emails (SMTP)
+
+Les codes de connexion et les liens de vérification sont envoyés par un serveur SMTP, celui d'un service d'envoi d'emails (par exemple [Brevo](https://www.brevo.com/fr/), dont l'offre gratuite suffit, Mailjet ou Mailgun) ou de votre messagerie. Ajoutez dans Render :
+
+| Variable | Rôle | Exemple |
+|---|---|---|
+| `SMTP_HOST` | Serveur SMTP | `smtp-relay.brevo.com` |
+| `SMTP_PORT` | Port : `587` (STARTTLS, exigé), `465` (TLS) ou `2525` | `587` |
+| `SMTP_USER` | Identifiant SMTP | fourni par le service |
+| `SMTP_PASSWORD` | Mot de passe ou clé SMTP | fourni par le service |
+| `SMTP_FROM` | Expéditeur des emails, d'une adresse ou d'un domaine validé chez le service | `Co-Loto <noreply@co-loto.com>` |
+| `SMTP_SECURE` | Facultatif : `true` pour forcer TLS dès la connexion | `true` si le port est `465` |
+
+Pour que les emails n'arrivent pas en courrier indésirable, validez le domaine `co-loto.com` chez le service d'envoi (enregistrements SPF et DKIM à ajouter chez le registraire du domaine). Si l'hébergeur bloque les ports SMTP habituels, utilisez le port `2525`, proposé par la plupart des services d'envoi.
+
+Sans `SMTP_HOST`, les emails sont affichés dans le journal du serveur en local ; sur Render, l'envoi est indisponible : le bouton « Vérifier mon adresse » n'apparaît pas, et une connexion qui demande un code est refusée avec un message.
+
+#### Espace d'administration
+
+Dans Render, ajoutez la variable `SUPERADMIN_EMAIL` avec votre adresse email (**Environment** > **Add Environment Variable**, puis **Save Changes**). Connectez-vous ensuite sur le site avec un service qui fournit cette adresse ; si elle n'est pas vérifiée par le service, vérifiez-la depuis « Mon espace » (l'envoi des emails doit être configuré, voir plus haut). Le menu burger affiche alors les entrées de l'administration.
 
 #### Base de données Turso (conserver les grilles)
 

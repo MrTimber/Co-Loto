@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Co-Loto · Code de connexion</title>
+  <meta name="theme-color" content="#0f766e">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icons/icon-192.png" type="image/png" sizes="192x192">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Co-Loto">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <script src="/js/splash.js"></script>
+  <header class="site-header">
+    <a class="logo" href="/"><img src="/img/logo.png" alt="Co-Loto" width="80" height="48"></a>
+  </header>
+  <main class="container">
+    <section class="card narrow" id="code-card">
+      <h1>Confirmez votre adresse</h1>
+      <p id="code-intro">Un compte Co-Loto existe déjà avec cette adresse email. Pour vous y connecter, saisissez le code à 6 chiffres que nous venons d'y envoyer.</p>
+      <form id="code-form" class="code-form">
+        <label>Code reçu par email
+          <input name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9 ]{6,7}" maxlength="7" required>
+        </label>
+        <p class="error" id="code-error" role="alert"></p>
+        <div class="actions"><button type="submit" class="primary">Se connecter</button></div>
+      </form>
+      <p class="muted small">Le code est valable 15 minutes. Rien reçu ? Vérifiez vos courriers indésirables, ou <a href="/connexion">recommencez la connexion</a>.</p>
+    </section>
+  </main>
+  <footer class="site-footer">
+    co-loto.com est un site gratuit, sans aucune affiliation avec la Française des Jeux (<a href="https://www.fdj.fr/" rel="noopener">fdj.fr</a>).
+  </footer>
+  <script type="module" src="/js/code-connexion.js"></script>
+  <script type="module" src="/js/header.js"></script>
+  <script type="module" src="/js/pwa.js"></script>
+</body>
+</html>
