@@ -85,6 +85,7 @@ h2 { font-size: 1.15rem; margin: 0 0 .75rem; }
   background: var(--surface);
 }
 .logo { grid-area: 1 / 1; justify-self: start; display: flex; }
+.logo:not([href]) { cursor: default; }
 .logo img { display: block; height: 48px; width: auto; }
 
 /* Écran d'accueil (voir js/splash.js) */
@@ -350,30 +351,38 @@ form label.game-option {
 /* Compte facultatif */
 .account { display: flex; gap: 1rem; align-items: center; font-weight: 600; }
 .account a { color: var(--brand); }
-/* Menu burger (classe « menu », posée par js/header.js) : sur petit écran, et toujours pour un administrateur.
-   Les liens du compte s'ouvrent alors sous l'en-tête. */
-.menu-toggle { display: none; padding: .45rem; border: 0; background: none; color: var(--brand); line-height: 0; }
+/* Menu burger (js/header.js), pour tout le monde et quelle que soit la taille de l'écran :
+   les entrées s'ouvrent sous l'en-tête. */
+.menu-toggle { display: inline-block; padding: .45rem; border: 0; background: none; color: var(--brand); line-height: 0; }
 .menu-toggle svg { width: 28px; height: 28px; }
-.account-links { display: flex; gap: 1rem; }
-.account.menu .menu-toggle { display: inline-block; }
-.account.menu .account-links { display: none; }
-.account.menu.open .account-links {
+.account-links { display: none; }
+.account.open .account-links {
   display: flex;
   flex-direction: column;
-  gap: 0;
   position: absolute;
   top: 100%;
   right: .5rem;
   z-index: 20;
   min-width: 12rem;
-  padding: .25rem 0;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   box-shadow: 0 8px 24px rgb(0 0 0 / .15);
+  overflow: hidden; /* le surlignement suit les coins arrondis */
 }
-.account.menu.open .account-links a { padding: .75rem 1rem; text-decoration: none; }
-.account.menu.open .account-links a[aria-current=page] { background: var(--accent-soft); }
+.account-links a, .account-links button { padding: .75rem 1rem; text-decoration: none; }
+.account-links a[aria-current=page] { background: var(--accent-soft); cursor: default; }
+.account-links a[href]:hover, .account-links button:hover { text-decoration: underline; }
+/* Dernière entrée (« Se connecter » ou « Se déconnecter »), après un séparateur. */
+.account-links .menu-end { margin-top: .25rem; border-top: 1px solid var(--border); }
+.account-links button.menu-end {
+  border: 0;
+  border-top: 1px solid var(--border);
+  border-radius: 0;
+  background: none;
+  color: var(--brand);
+  text-align: left;
+}
 .account-links .menu-heading {
   margin: .25rem 0 0;
   padding: .6rem 1rem .25rem;
