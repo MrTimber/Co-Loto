@@ -98,7 +98,7 @@ Le jeu est choisi à la création du salon :
 
 ## Espace d'administration
 
-Réservé aux administrateurs, il est accessible depuis le menu burger, qu'un administrateur connecté voit toujours, même sur grand écran. Pour tout autre visiteur, ses pages, ses scripts et son API n'existent pas (erreur 404) et le menu reste le menu habituel.
+Réservé aux administrateurs, il est accessible depuis le menu burger, que toute personne connectée voit toujours, même sur grand écran (« Se déconnecter » y figure en dernier). Pour tout autre visiteur, ses pages, ses scripts et son API n'existent pas (erreur 404) et le menu ne contient pas d'entrées d'administration.
 
 - **Superadmin** : il y en a un seul, désigné par la variable d'environnement `SUPERADMIN_EMAIL`. C'est le compte qui a cette adresse email (une adresse n'appartient qu'à un compte, voir « Comptes et adresses email »), **à condition qu'elle soit vérifiée**. Le compte n'a pas besoin d'exister à l'avance : il devient superadmin dès qu'il a cette adresse, vérifiée. Son rôle ne peut pas lui être retiré ; seul un changement de la variable désigne un autre superadmin.
 - **Administrateurs** : le superadmin nomme ou retire les administrateurs depuis la page « Utilisateurs ». Seul un compte dont l'adresse email est vérifiée peut être nommé, et un rôle n'est effectif qu'avec une adresse vérifiée.
