@@ -80,8 +80,19 @@ function profileForm(user, providers, canVerify) {
   const consent = el('input');
   Object.assign(consent, { name: 'emailConsent', type: 'checkbox', checked: user.emailConsent, disabled: !user.emailVerified });
   const consentLabel = el('label', 'inline', consent, ' M\u2019envoyer par email le résultat de mes grilles qui ont une date de tirage');
-  // Infobulle sur le libellé : une case désactivée ne reçoit pas le survol dans tous les navigateurs.
-  if (!user.emailVerified) consentLabel.title = 'Option disponible une fois votre adresse email vérifiée.';
+  // Case désactivée sans adresse vérifiée : texte grisé et infobulle, au survol (case ou texte) et au toucher.
+  if (!user.emailVerified) {
+    const tip = el('span', 'tooltip', 'Option disponible une fois votre adresse email vérifiée.');
+    tip.id = 'consent-tip';
+    tip.setAttribute('role', 'tooltip');
+    consent.setAttribute('aria-describedby', tip.id);
+    consentLabel.classList.add('disabled', 'has-tooltip');
+    consentLabel.append(tip);
+    consentLabel.addEventListener('click', () => consentLabel.classList.toggle('tip-open'));
+    document.addEventListener('click', (event) => {
+      if (!consentLabel.contains(event.target)) consentLabel.classList.remove('tip-open');
+    });
+  }
   const status = el('output', 'small');
   const save = el('button', 'primary', 'Enregistrer');
   save.type = 'submit';
