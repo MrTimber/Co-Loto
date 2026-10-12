@@ -79,6 +79,9 @@ function profileForm(user, providers, canVerify) {
   Object.assign(name, { name: 'name', required: true, maxLength: 24, autocomplete: 'nickname', value: user.name });
   const consent = el('input');
   Object.assign(consent, { name: 'emailConsent', type: 'checkbox', checked: user.emailConsent, disabled: !user.emailVerified });
+  const consentLabel = el('label', 'inline', consent, ' M\u2019envoyer par email le résultat de mes grilles qui ont une date de tirage');
+  // Infobulle sur le libellé : une case désactivée ne reçoit pas le survol dans tous les navigateurs.
+  if (!user.emailVerified) consentLabel.title = 'Option disponible une fois votre adresse email vérifiée.';
   const status = el('output', 'small');
   const save = el('button', 'primary', 'Enregistrer');
   save.type = 'submit';
@@ -86,8 +89,7 @@ function profileForm(user, providers, canVerify) {
     el('h2', '', 'Mon compte'),
     field('Pseudo', name),
     emailInfo(user, providers, canVerify),
-    el('label', 'inline', consent, ' M\u2019envoyer par email le résultat de mes grilles qui ont une date de tirage'),
-    user.emailVerified ? '' : el('p', 'small muted', 'Option disponible une fois votre adresse email vérifiée.'),
+    consentLabel,
     el('p', 'small muted', 'L\u2019envoi des résultats arrivera dans une prochaine version. Vous pouvez retirer cet accord à tout moment.'),
     el('div', 'actions', save, status),
   );
