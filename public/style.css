@@ -122,6 +122,30 @@ h2 { font-size: 1.15rem; margin: 0 0 .75rem; }
 
 form label, .invite label { display: block; margin-bottom: 1rem; font-weight: 600; }
 form label.inline { font-weight: 400; margin-bottom: .25rem; }
+form label.disabled { color: var(--muted); cursor: not-allowed; }
+.has-tooltip { position: relative; width: fit-content; }
+.tooltip {
+  position: absolute;
+  left: 0;
+  top: calc(100% + .45rem);
+  width: max-content;
+  max-width: min(18rem, 80vw);
+  padding: .4rem .6rem;
+  border-radius: 6px;
+  background: var(--text);
+  color: var(--surface);
+  font-size: .8rem;
+  font-weight: 400;
+  line-height: 1.35;
+  box-shadow: 0 4px 12px rgb(0 0 0 / .18);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity .15s, visibility .15s;
+  pointer-events: none;
+  z-index: 10;
+}
+.tooltip::after { content: ''; position: absolute; bottom: 100%; left: .55rem; border: 5px solid transparent; border-bottom-color: var(--text); }
+.has-tooltip:hover .tooltip, .has-tooltip.tip-open .tooltip { opacity: 1; visibility: visible; }
 fieldset { border: 0; padding: 0; margin: 0 0 1rem; }
 legend { font-weight: 600; margin-bottom: .25rem; padding: 0; }
 input:not([type=radio]), select {

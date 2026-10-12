@@ -79,6 +79,20 @@ function profileForm(user, providers, canVerify) {
   Object.assign(name, { name: 'name', required: true, maxLength: 24, autocomplete: 'nickname', value: user.name });
   const consent = el('input');
   Object.assign(consent, { name: 'emailConsent', type: 'checkbox', checked: user.emailConsent, disabled: !user.emailVerified });
+  const consentLabel = el('label', 'inline', consent, ' M\u2019envoyer par email le résultat de mes grilles qui ont une date de tirage');
+  // Case désactivée sans adresse vérifiée : texte grisé et infobulle, au survol (case ou texte) et au toucher.
+  if (!user.emailVerified) {
+    const tip = el('span', 'tooltip', 'Option disponible une fois votre adresse email vérifiée.');
+    tip.id = 'consent-tip';
+    tip.setAttribute('role', 'tooltip');
+    consent.setAttribute('aria-describedby', tip.id);
+    consentLabel.classList.add('disabled', 'has-tooltip');
+    consentLabel.append(tip);
+    consentLabel.addEventListener('click', () => consentLabel.classList.toggle('tip-open'));
+    document.addEventListener('click', (event) => {
+      if (!consentLabel.contains(event.target)) consentLabel.classList.remove('tip-open');
+    });
+  }
   const status = el('output', 'small');
   const save = el('button', 'primary', 'Enregistrer');
   save.type = 'submit';
@@ -86,7 +100,7 @@ function profileForm(user, providers, canVerify) {
     el('h2', '', 'Mon compte'),
     field('Pseudo', name),
     emailInfo(user, providers, canVerify),
-    el('label', 'inline', consent, ' M\u2019envoyer par email le résultat de mes grilles qui ont une date de tirage'),
+    consentLabel,
     el('p', 'small muted', 'L\u2019envoi des résultats arrivera dans une prochaine version. Vous pouvez retirer cet accord à tout moment.'),
     el('div', 'actions', save, status),
   );

@@ -237,6 +237,9 @@ export async function openStore({ url, authToken, file = ':memory:', superadminE
   if (!userColumns.has('last_login_at')) await run('ALTER TABLE users ADD COLUMN last_login_at INTEGER');
   // Grilles reprises avec un compte à l'adresse non vérifiée : le joueur est invité à les relire.
   if (!userColumns.has('review_grids')) await run('ALTER TABLE users ADD COLUMN review_grids INTEGER NOT NULL DEFAULT 0');
+  // L'accord pour recevoir les résultats exige une adresse vérifiée : un accord donné avant cette
+  // règle sur une adresse non prouvée a pu l'être par quelqu'un d'autre que son propriétaire.
+  await run('UPDATE users SET email_consent = 0 WHERE email_consent = 1 AND (email IS NULL OR email_verified = 0)');
   await mergeAccountsByEmail(db, !loginsExisted);
   // Première mise en place des statistiques : les grilles encore conservées y sont reprises.
   if (!gridStatsExisted) {
