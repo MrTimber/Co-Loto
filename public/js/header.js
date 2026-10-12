@@ -2,7 +2,8 @@
 // « Accueil » et se termine par « Se connecter » (si la connexion est proposée) ou « Se déconnecter » ;
 // entre les deux, « Mon espace » et, pour un administrateur, les entrées de l'administration
 // (chargées depuis l'espace d'administration).
-import { getAccount, claimStoredGrids, currentPath, el } from './account.js';
+import { getAccount, claimStoredGrids, currentPath, logoutButton } from './account.js';
+import { el } from './common.js';
 
 const header = document.querySelector('.site-header');
 const here = location.pathname.replace(/\/$/, '') || '/';
@@ -33,13 +34,7 @@ if (header) {
     }
   }
   if (user) {
-    const logout = el('button', 'menu-end', 'Se déconnecter');
-    logout.type = 'button';
-    logout.addEventListener('click', async () => {
-      await fetch('/auth/deconnexion', { method: 'POST' });
-      location.href = '/';
-    });
-    links.append(logout);
+    links.append(logoutButton('menu-end'));
   } else if (providers.length) {
     const login = pageLink('/connexion', 'Se connecter');
     login.classList.add('menu-end');

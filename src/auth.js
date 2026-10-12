@@ -5,10 +5,11 @@
 import express from 'express';
 import * as oidc from 'openid-client';
 import { loginCodeEmail, verificationEmail } from './mail.js';
-import { DEFAULT_NAME, LOGIN_CODE_LIFETIME_MS } from './store.js';
+import { DEFAULT_NAME, LOGIN_CODE_LIFETIME_MS, SESSION_LIFETIME_MS } from './store.js';
 
 const SESSION_COOKIE = 'coloto_session';
 const OAUTH_COOKIE = 'coloto_oauth';
+const CODE_COOKIE = 'coloto_code';
 const OAUTH_MAX_AGE_MS = 10 * 60_000;
 const NAME_MAX_LENGTH = 24; // comme le pseudo des parties
 const EMAIL_MAX_LENGTH = 254;
@@ -25,7 +26,8 @@ async function getJson(fetchImpl, url, accessToken) {
 // Adresse email renvoyée par le fournisseur, et s'il l'a vérifiée.
 const emailOf = (email, verified) => (typeof email === 'string' ? { email, emailVerified: Boolean(verified) } : { email: null, emailVerified: false });
 
-const CODE_COOKIE = 'coloto_code';
+// Message d'erreur écrit sur une seule ligne du journal : il peut contenir une réponse du fournisseur.
+const oneLine = (err) => String(err.message).replaceAll(/[\r\n]/g, ' ');
 
 // `server` : adresse de découverte OpenID Connect, ou points d'accès OAuth 2.0 déclarés à la main.
 // `profile` renvoie l'identifiant, l'email et, quand le fournisseur en a un, un pseudo
@@ -151,7 +153,6 @@ export function isEmail(value) {
 const DEFAULT_RETURN = '/mon-espace';
 const STATIC_RETURNS = new Map(['/', '/mon-espace', '/confidentialite'].map((path) => [path, path]));
 
-// `findRoomId` : identifiant d'un salon ouvert, ou undefined.
 // « alice@example.com » devient « a•••@example.com ».
 export function maskEmail(email) {
   const [local, domain] = String(email).split('@');
@@ -159,6 +160,7 @@ export function maskEmail(email) {
 }
 
 // `mailer` : envoi des emails (voir mail.js), null s'il est indisponible.
+// `findRoomId` : identifiant d'un salon ouvert, ou undefined.
 export function createAuth({ store, env = process.env, mailer = null, findRoomId = () => undefined, fetchImpl = (...args) => globalThis.fetch(...args) }) {
   const providers = enabledProviders(env);
 
@@ -213,14 +215,14 @@ export function createAuth({ store, env = process.env, mailer = null, findRoomId
     return store.getSessionUser(parseCookies(req.headers.cookie)[SESSION_COOKIE]);
   }
 
-  // Pseudo d'un nouveau compte : celui du fournisseur s'il en a un (GitHub, Discord),
-  // sinon celui que le joueur utilise déjà dans ses parties.
   const openSession = async (req, res, user) =>
-    res.cookie(SESSION_COOKIE, await store.createSession(user.id), cookieOptions(req, 30 * 24 * 60 * 60_000));
+    res.cookie(SESSION_COOKIE, await store.createSession(user.id), cookieOptions(req, SESSION_LIFETIME_MS));
 
   // Connecte le joueur et renvoie l'adresse où le rediriger. Un joueur déjà connecté qui se connecte
   // avec un autre fournisseur lui lie ce fournisseur. Si un compte a déjà l'adresse non vérifiée
   // que donne le fournisseur, un code est d'abord envoyé à cette adresse.
+  // Pseudo d'un nouveau compte : celui que le joueur utilise déjà dans ses parties, sinon celui
+  // du fournisseur s'il en a un (GitHub, Discord).
   async function logIn(req, res, { provider, providerId, pseudo, email = null, emailVerified = false, retour }) {
     const name = cleanName(pseudo) || DEFAULT_NAME;
     const linkTo = (await currentUser(req))?.id;
@@ -259,7 +261,7 @@ export function createAuth({ store, env = process.env, mailer = null, findRoomId
     try {
       config = await configuration(providerId);
     } catch (err) {
-      console.error(`${PROVIDERS[providerId].label} injoignable :`, String(err.message).replaceAll(/[\r\n]/g, ' '));
+      console.error(`${PROVIDERS[providerId].label} injoignable :`, oneLine(err));
       return res.redirect(`/connexion?erreur=1&retour=${encodeURIComponent(await returnPath(req.query.retour))}`);
     }
     const state = oidc.randomState();
@@ -313,8 +315,7 @@ export function createAuth({ store, env = process.env, mailer = null, findRoomId
         }),
       );
     } catch (err) {
-      // Message nettoyé : il peut contenir une réponse du fournisseur.
-      console.error(`Connexion ${PROVIDERS[providerId].label} impossible :`, String(err.message).replaceAll(/[\r\n]/g, ' '));
+      console.error(`Connexion ${PROVIDERS[providerId].label} impossible :`, oneLine(err));
       failed();
     }
   });
@@ -351,7 +352,7 @@ export function createAuth({ store, env = process.env, mailer = null, findRoomId
     try {
       await mailer.send({ to: created.email, ...verificationEmail(baseUrl(req), created.token) });
     } catch (err) {
-      console.error('Envoi de l’email de vérification impossible :', String(err.message).replaceAll(/[\r\n]/g, ' '));
+      console.error('Envoi de l’email de vérification impossible :', oneLine(err));
       return res.status(502).json({ error: 'L’email n’a pas pu être envoyé, réessayez plus tard.' });
     }
     res.json({ ok: true });

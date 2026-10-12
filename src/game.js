@@ -107,14 +107,12 @@ export function removePlayer(game, playerId) {
   if (index === -1) return null;
   game.players.splice(index, 1);
   if (game.hostId === playerId) game.hostId = game.players[0]?.id ?? null;
-  if (game.status === 'playing') {
-    if (game.players.length === 0) {
-      game.status = 'abandoned';
-      return null;
-    }
-    return maybeEndRound(game);
+  if (game.status !== 'playing') return null;
+  if (game.players.length === 0) {
+    game.status = 'abandoned';
+    return null;
   }
-  return null;
+  return maybeEndRound(game);
 }
 
 function maybeEndRound(game) {
@@ -132,29 +130,26 @@ function endRound(game) {
   }
 
   const validated = game.validated[phase];
-  const candidates = commonPicks(game.players, phase).filter((n) => !validated.includes(n));
-  const { count } = phaseRules(game);
   // Plusieurs numéros peuvent devenir unanimes au même tour : ils sont tous gardés, même
   // au-delà du nombre prévu. Les joueurs choisiront à la fin de jouer une grille multiple
   // ou d'écarter les numéros en trop.
-  const newlyValidated = candidates;
+  const newlyValidated = commonPicks(game.players, phase).filter((n) => !validated.includes(n));
   validated.push(...newlyValidated);
   validated.sort((a, b) => a - b);
 
-  const result = { round: game.round, phase, picks: roundPicks, newlyValidated: [...newlyValidated].sort((a, b) => a - b) };
+  const result = { round: game.round, phase, picks: roundPicks, newlyValidated };
   game.rounds.push(result);
   game.lastRound = result;
 
-  if (validated.length >= count) {
+  if (validated.length >= phaseRules(game).count) {
     const phases = GAMES[game.gameType].phases;
     const next = phases[phases.findIndex((p) => p.key === phase) + 1];
-    if (next) {
-      game.phase = next.key;
-    } else {
+    if (!next) {
       game.status = 'finished';
       game.phase = null;
       return result;
     }
+    game.phase = next.key;
   }
   game.round += 1;
   return result;

@@ -1,4 +1,4 @@
-import { saveToken, formatDrawDate, escapeHtml, rulesFor, applyTheme, describeGame } from './common.js';
+import { saveToken, formatDrawDate, escapeHtml, rulesFor, applyTheme, describeGame, NAME_KEY } from './common.js';
 import { GAMES, upcomingDrawDates } from './games.js';
 
 const form = document.getElementById('create-form');
@@ -6,7 +6,7 @@ const errorBox = document.getElementById('create-error');
 const select = form.elements.maxPlayers;
 
 for (let n = 2; n <= 12; n++) select.add(new Option(`${n} joueurs`, n, n === 12, n === 12));
-form.elements.name.value = localStorage.getItem('coloto:name') ?? '';
+form.elements.name.value = localStorage.getItem(NAME_KEY) ?? '';
 
 // Le formulaire en cours de saisie est gardé pendant la session : revenir à l'accueil
 // (par le logo, par exemple) ne ramène pas au Loto et n'efface pas les choix déjà faits.
@@ -69,7 +69,8 @@ function selectGame() {
   const rules = rulesFor(form.elements.gameType.value);
   applyTheme(rules.id);
   document.getElementById('header-badge').textContent = rules.name;
-  document.getElementById('game-summary').textContent = `${describeGame(rules)[0].toUpperCase()}${describeGame(rules).slice(1)}`;
+  const summary = describeGame(rules);
+  document.getElementById('game-summary').textContent = summary[0].toUpperCase() + summary.slice(1);
   document.getElementById('draw-days').textContent = `${rules.theName} est tiré ${rules.drawDays}.`;
   fillDrawDates(rules);
 }
@@ -94,7 +95,7 @@ form.addEventListener('submit', async (event) => {
     });
     const body = await res.json();
     if (!res.ok) throw new Error(body.error);
-    localStorage.setItem('coloto:name', data.name);
+    localStorage.setItem(NAME_KEY, data.name);
     saveToken(body.roomId, body.token);
     location.href = `/salon/${body.roomId}`;
   } catch (err) {

@@ -1,4 +1,4 @@
-import { saveToken, loadToken, forgetToken, escapeHtml, formatDrawDate, ball, rulesFor, applyTheme, countLabel, gridBalls } from './common.js';
+import { saveToken, loadToken, forgetToken, escapeHtml, formatDrawDate, ball, rulesFor, applyTheme, countLabel, gridBalls, NAME_KEY } from './common.js';
 import { renderGridAccountOffer } from './account.js';
 import { renderPlayOptions } from './play-options.js';
 
@@ -82,10 +82,10 @@ $('join-form').addEventListener('submit', (event) => {
   event.preventDefault();
   $('join-error').textContent = '';
   const name = event.target.elements.name.value;
-  localStorage.setItem('coloto:name', name);
+  localStorage.setItem(NAME_KEY, name);
   join({ name });
 });
-$('join-form').elements.name.value = localStorage.getItem('coloto:name') ?? '';
+$('join-form').elements.name.value = localStorage.getItem(NAME_KEY) ?? '';
 
 const inviteUrl = `${location.origin}/salon/${encodeURIComponent(roomId)}`;
 $('invite-link').value = inviteUrl;

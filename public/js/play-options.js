@@ -1,18 +1,11 @@
 import { gridCost } from './games.js';
-import { countLabel } from './common.js';
+import { countLabel, el } from './common.js';
 
 // Quand plusieurs numéros ont été validés au même tour, la grille peut en compter plus que prévu.
 // Chacun choisit alors, de son côté, les numéros à jouer : tous (grille multiple, plus chère)
 // ou seulement le nombre classique (grille simple). Co-Loto ne fait qu'informer : rien n'est parié ici.
 
 const euros = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' });
-
-function el(tag, className, ...children) {
-  const node = document.createElement(tag);
-  if (className) node.className = className;
-  node.append(...children);
-  return node;
-}
 
 // « 7 numéros au lieu de 5 », pour chaque phase en surnombre.
 export function overflowSummary(rules, validated) {

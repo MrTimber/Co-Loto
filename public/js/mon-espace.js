@@ -1,17 +1,12 @@
-import { getAccount, claimStoredGrids, providerButtons, el } from './account.js';
-import { rulesFor, formatDrawDate } from './common.js';
+import { getAccount, claimStoredGrids, providerButtons, logoutButton } from './account.js';
+import { rulesFor, formatDrawDate, formatDay, ballNodes, el, NAME_KEY } from './common.js';
 
 const card = document.getElementById('my-grids');
 const PROVIDER_NAMES = { google: 'Google', microsoft: 'Microsoft', github: 'GitHub', discord: 'Discord', facebook: 'Facebook', dev: 'le compte de test' };
-const dateFormat = { day: 'numeric', month: 'long', year: 'numeric' };
-
-function balls(numbers, extra) {
-  return numbers.map((n) => el('span', `ball ${extra}`, String(n)));
-}
 
 function gridItem(grid) {
   const rules = rulesFor(grid.gameType);
-  const created = new Date(grid.createdAt).toLocaleDateString('fr-FR', dateFormat);
+  const created = formatDay(grid.createdAt);
   const link = el('a', '', `${rules.name} du ${created}`);
   link.href = `/grille/${encodeURIComponent(grid.id)}`;
   const remove = el('button', 'link small', 'Retirer');
@@ -21,7 +16,7 @@ function gridItem(grid) {
     'li',
     'my-grid',
     el('p', 'my-grid-title', link),
-    el('div', 'summary', ...balls(grid.numbers, 'validated'), ...balls(grid.bonus, 'bonus')),
+    el('div', 'summary', ...ballNodes(grid.numbers, grid.bonus)),
     el('p', 'small muted', `Avec ${grid.players.join(', ')}`, grid.drawDate ? ` · tirage du ${formatDrawDate(grid.drawDate)}` : ''),
     remove,
   );
@@ -115,7 +110,7 @@ function profileForm(user, providers, canVerify) {
     const body = await res?.json().catch(() => ({}));
     if (res?.ok) {
       status.textContent = 'Enregistré.';
-      localStorage.setItem('coloto:name', name.value.trim());
+      localStorage.setItem(NAME_KEY, name.value.trim());
     } else {
       status.className = 'small error';
       status.textContent = body?.error ?? 'Enregistrement impossible, réessayez.';
@@ -125,12 +120,6 @@ function profileForm(user, providers, canVerify) {
 }
 
 function accountActions(user) {
-  const logout = el('button', '', 'Se déconnecter');
-  logout.type = 'button';
-  logout.addEventListener('click', async () => {
-    await fetch('/auth/deconnexion', { method: 'POST' });
-    location.href = '/';
-  });
   const remove = el('button', 'link danger', 'Supprimer mon compte');
   remove.type = 'button';
   remove.addEventListener('click', async () => {
@@ -142,7 +131,7 @@ function accountActions(user) {
   privacy.href = '/confidentialite';
   return [
     el('p', 'small muted', `Connexion avec ${providerNames(user.providers)}. `, privacy),
-    el('div', 'actions', logout),
+    el('div', 'actions', logoutButton()),
     el('div', 'danger-zone', remove),
   ];
 }

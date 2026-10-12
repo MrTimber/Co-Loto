@@ -1,6 +1,6 @@
 // Compte facultatif : boutons de connexion, encart de fin de partie,
 // et rattachement des grilles jouées sur cet appareil au compte connecté.
-import { loadToken } from './common.js';
+import { loadToken, storedTokenIds, el, NAME_KEY } from './common.js';
 
 let accountPromise = null;
 
@@ -11,13 +11,6 @@ export function getAccount() {
   return accountPromise;
 }
 
-export function el(tag, className, ...children) {
-  const node = document.createElement(tag);
-  if (className) node.className = className;
-  node.append(...children);
-  return node;
-}
-
 export const currentPath = () => location.pathname + location.search;
 
 // Un bouton par fournisseur ; on revient sur `retour` une fois connecté.
@@ -26,7 +19,7 @@ export function providerButtons(providers, retour = currentPath()) {
     const link = el('a', `button provider provider-${p.id}`, `Continuer avec ${p.label}`);
     // Le pseudo déjà utilisé dans les parties sert de pseudo au nouveau compte.
     const params = new URLSearchParams({ retour });
-    const pseudo = localStorage.getItem('coloto:name');
+    const pseudo = localStorage.getItem(NAME_KEY);
     if (pseudo) params.set('pseudo', pseudo);
     link.href = `/auth/${p.id}?${params}`;
     return link;
@@ -47,10 +40,18 @@ export async function claimGrid(gridId) {
 
 // Toutes les parties jouées sur cet appareil (une partie encore en cours est simplement ignorée).
 export async function claimStoredGrids() {
-  const ids = Object.keys(localStorage)
-    .filter((key) => key.startsWith('coloto:token:'))
-    .map((key) => key.slice('coloto:token:'.length));
-  await Promise.all(ids.map(claimGrid));
+  await Promise.all(storedTokenIds().map(claimGrid));
+}
+
+// Bouton « Se déconnecter » : ramène à l'accueil.
+export function logoutButton(className = '') {
+  const button = el('button', className, 'Se déconnecter');
+  button.type = 'button';
+  button.addEventListener('click', async () => {
+    await fetch('/auth/deconnexion', { method: 'POST' });
+    location.href = '/';
+  });
+  return button;
 }
 
 // Encart affiché sous une grille terminée : soit « elle est dans vos grilles »,
