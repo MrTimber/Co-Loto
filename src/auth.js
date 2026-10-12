@@ -340,9 +340,8 @@ export function createAuth({ store, env = process.env, mailer = null, findRoomId
     const created = await store.createVerification(req.user.id);
     if (!created) return res.status(400).json({ error: 'Votre adresse est déjà vérifiée.' });
     if (created.tooSoon) return res.status(429).json({ error: 'Un email vient d’être envoyé : patientez une minute avant d’en demander un autre.' });
-    const link = `${baseUrl(req)}/verifier-email?jeton=${encodeURIComponent(created.token)}`;
     try {
-      await mailer.send({ to: created.email, ...verificationEmail(link) });
+      await mailer.send({ to: created.email, ...verificationEmail(baseUrl(req), created.token) });
     } catch (err) {
       console.error('Envoi de l’email de vérification impossible :', String(err.message).replaceAll(/[\r\n]/g, ' '));
       return res.status(502).json({ error: 'L’email n’a pas pu être envoyé, réessayez plus tard.' });
