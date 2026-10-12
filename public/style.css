@@ -23,7 +23,7 @@
   --radius: 12px;
   /* Largeur maximale du site : au-delà, bandes neutres sur les côtés. */
   --page-max: 1200px;
-  --page-side: #e4e7ec;
+  --page-side: color-mix(in srgb, var(--brand) 12%, #fff);
   color-scheme: light dark;
 }
 
@@ -45,7 +45,7 @@
     --bonus-text: #fff;
     --picked: #263045;
     --danger: #f97066;
-    --page-side: #232936;
+    --page-side: color-mix(in srgb, var(--brand) 14%, #0f1420);
   }
 }
 
