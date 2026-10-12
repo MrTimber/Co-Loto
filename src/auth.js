@@ -102,14 +102,21 @@ export const PROVIDERS = {
   },
 };
 
-// Fournisseurs activés, dans l'ordre d'affichage. Le compte de test (`AUTH_DEV_LOGIN=1`)
-// sert au développement local ; il est toujours refusé sur Render.
+// Le compte de test (`AUTH_DEV_LOGIN=1`) connecte n'importe qui avec l'adresse de son choix,
+// comptée comme vérifiée : avec celle du superadmin, il donne tous les droits. Il ne sert donc
+// qu'au développement local et il est toujours refusé sur Render, avec NODE_ENV=production
+// et avec la base Turso (la vraie base, même depuis un poste de développement).
+export function devLoginAllowed(env) {
+  return env.AUTH_DEV_LOGIN === '1' && !env.RENDER && env.NODE_ENV !== 'production' && !env.TURSO_DATABASE_URL;
+}
+
+// Fournisseurs activés, dans l'ordre d'affichage.
 export function enabledProviders(env) {
   const ids = Object.keys(PROVIDERS).filter((id) => {
     const { envPrefix } = PROVIDERS[id];
     return env[`${envPrefix}_CLIENT_ID`] && env[`${envPrefix}_CLIENT_SECRET`];
   });
-  if (env.AUTH_DEV_LOGIN === '1' && !env.RENDER) ids.push('dev');
+  if (devLoginAllowed(env)) ids.push('dev');
   return ids;
 }
 

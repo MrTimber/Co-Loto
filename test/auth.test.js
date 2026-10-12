@@ -68,6 +68,9 @@ test('fournisseurs activés selon les variables d’environnement', () => {
   );
   assert.deepEqual(enabledProviders({ AUTH_DEV_LOGIN: '1' }), ['dev']);
   assert.deepEqual(enabledProviders({ AUTH_DEV_LOGIN: '1', RENDER: 'true' }), []);
+  assert.deepEqual(enabledProviders({ AUTH_DEV_LOGIN: '1', NODE_ENV: 'production' }), []);
+  assert.deepEqual(enabledProviders({ AUTH_DEV_LOGIN: '1', TURSO_DATABASE_URL: 'libsql://co-loto.turso.io' }), []);
+  assert.deepEqual(enabledProviders({ AUTH_DEV_LOGIN: 'true' }), []);
 });
 
 test('pseudo et adresse email', () => {

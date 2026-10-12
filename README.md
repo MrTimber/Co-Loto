@@ -180,7 +180,7 @@ Variables d'environnement facultatives :
 | `PUBLIC_URL` | Adresse publique du site, pour les URL de rappel de la connexion : `https://co-loto.com` en production (indispensable avec un nom de domaine personnalisé) | `RENDER_EXTERNAL_URL` sur Render (adresse `…onrender.com`), sinon adresse de la requête |
 | `SUPERADMIN_EMAIL` | Adresse email du superadmin de l'espace d'administration (voir « Espace d'administration ») | _(aucun administrateur)_ |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`, `SMTP_SECURE` | Serveur SMTP pour envoyer les codes de connexion et les liens de vérification d'adresse (voir « Envoi des emails ») | _(emails affichés dans le journal en local, indisponibles sur Render)_ |
-| `AUTH_DEV_LOGIN` | `1` ajoute un « compte de test » sans fournisseur, pour le développement local (toujours ignoré sur Render) | _(désactivé)_ |
+| `AUTH_DEV_LOGIN` | `1` ajoute un « compte de test » sans fournisseur, pour le développement local (toujours ignoré sur Render, avec `NODE_ENV=production` et avec la base Turso, car il permet de se connecter avec l'adresse du superadmin) | _(désactivé)_ |
 
 Un fournisseur n'apparaît que si son identifiant **et** son secret sont définis. Sans aucun, le site fonctionne sans compte, comme avant.
 
