@@ -17,3 +17,6 @@ services:
         sync: false
       - key: TURSO_AUTH_TOKEN
         sync: false
+      # Adresse email du superadmin de l'espace d'administration (voir le README).
+      - key: SUPERADMIN_EMAIL
+        sync: false

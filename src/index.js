@@ -3,7 +3,7 @@ import { databaseFrom, openStore } from './store.js';
 
 const port = Number(process.env.PORT ?? 3000);
 const database = databaseFrom(process.env);
-const store = await openStore(database);
+const store = await openStore({ ...database, superadminEmail: process.env.SUPERADMIN_EMAIL });
 const { httpServer } = createApp({ store });
 const storage = database.url ? 'base Turso' : `fichier ${database.file}`;
 

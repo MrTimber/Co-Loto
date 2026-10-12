@@ -76,6 +76,7 @@ Le jeu est choisi à la création du salon :
 - [x] Date de tirage optionnelle (limitée aux jours de tirage du jeu)
 - [x] Installable comme une application sur smartphone et tablette (PWA)
 - [x] Connexion facultative (Google, Microsoft, GitHub, Discord, Facebook) et page « Mon espace »
+- [x] Espace d'administration : utilisateurs et leurs grilles, fréquentation du site, numéros les plus joués
 - [ ] Vérification des résultats officiels à la date du tirage
 - [ ] Envoi des résultats par email (avec consentement)
 
@@ -94,6 +95,26 @@ Le jeu est choisi à la création du salon :
   Prix d'une grille simple, sans option : 2,20 € au Loto, 2,50 € à l'Euromillions (My Million compris) et à EuroDreams. Co-Loto informe seulement : rien n'est parié sur le site.
 - Les choix des numéros complémentaires repartent de zéro : ils sont indépendants des numéros déjà choisis.
 - Un joueur qui ferme sa page peut revenir avec le même lien (son navigateur garde un jeton). S'il reste déconnecté plus de 90 secondes, il quitte la partie et le tour continue sans lui. Si le créateur part, le rôle passe au joueur suivant.
+
+## Espace d'administration
+
+Réservé aux administrateurs, il est accessible depuis le menu burger, qu'un administrateur connecté voit toujours, même sur grand écran. Pour tout autre visiteur, ses pages, ses scripts et son API n'existent pas (erreur 404) et le menu reste le menu habituel.
+
+- **Superadmin** : il y en a un seul, désigné par la variable d'environnement `SUPERADMIN_EMAIL`. C'est le compte (le plus ancien, s'il y en a plusieurs) dont l'adresse email est celle-ci **et a été vérifiée par le fournisseur de connexion** : Google, GitHub, Discord ou Facebook. Une adresse saisie à la main dans « Mon espace », ou reçue de Microsoft, n'est pas considérée comme vérifiée et ne suffit donc pas. Le compte n'a pas besoin d'exister à l'avance : il devient superadmin à sa première connexion. Son rôle ne peut pas lui être retiré ; seul un changement de la variable désigne un autre superadmin.
+- **Administrateurs** : le superadmin nomme ou retire les administrateurs depuis la page « Utilisateurs ».
+
+Pages :
+
+| Page | Contenu |
+|---|---|
+| `/admin` (tableau de bord) | Salons et joueurs en ce moment, visites, salons créés, grilles co-créées, comptes, grilles par jeu (joueurs et tours en moyenne) |
+| `/admin/utilisateurs` | Liste des comptes (pseudo, fournisseur, email, inscription, dernière connexion, rôle), recherche, grilles co-créées par chacun, nomination des administrateurs |
+| `/admin/frequentation` | Visiteurs et pages vues par jour (ou par semaine), grilles co-créées, pages les plus vues, sites d'origine, appareils, salons et grilles par jeu, inscriptions et connexions par fournisseur, sur 7 jours à 12 mois |
+| `/admin/numeros` | Numéros et numéros complémentaires les plus joués pour chaque jeu, sur une période d'un jour à un an, ou pour un tirage précis |
+
+**Mesure d'audience sans outil externe.** Le serveur compte lui-même les pages ouvertes par un navigateur (les robots et le contrôle de santé de Render sont ignorés), par jour : page, type d'appareil, site d'origine. Un visiteur est compté une fois par jour grâce à une empreinte de son adresse IP et de son navigateur, mélangée à un sel tiré au sort chaque jour ; sels et empreintes sont effacés le lendemain. Aucun cookie, aucune adresse IP n'est enregistrée, et les visites d'un jour à l'autre ne peuvent pas être reliées.
+
+**Statistiques des numéros.** À la fin de chaque partie, les numéros de la grille sont aussi copiés, avec le jeu, la date de tirage, le nombre de joueurs et de tours, mais **sans les pseudos ni aucun lien vers la grille ou les joueurs**. Cette copie est gardée 3 ans, alors que la grille et ses joueurs sont effacés au bout de 30 jours. Les compteurs de fréquentation sont aussi gardés 3 ans.
 
 ## Stack technique
 
@@ -118,11 +139,14 @@ src/game.js       Règles du jeu (sans réseau, entièrement testées)
 src/app.js        Serveur HTTP, API et événements temps réel
 src/store.js      Stockage des grilles terminées (30 jours), des comptes et des sessions (Turso ou fichier SQLite)
 src/auth.js       Connexion Google, Microsoft, GitHub, Discord, Facebook (OAuth 2.0 avec openid-client) et API « Mon espace »
+src/admin.js      Espace d'administration : pages et API réservées aux administrateurs
+src/stats.js      Mesure d'audience (pages vues, visiteurs du jour, appareils, sites d'origine)
 src/drawDate.js   Validation de la date de tirage
 src/index.js      Point d'entrée
 public/           Pages web (accueil, salon, grille, connexion, « Mon espace », confidentialité, page hors ligne)
 public/js/        Scripts des pages (modules JavaScript)
 public/sw.js      Service worker (installation, copie des fichiers statiques)
+admin/            Page et scripts de l'administration, servis seulement aux administrateurs
 test/             Tests automatisés
 ```
 
@@ -153,11 +177,14 @@ Variables d'environnement facultatives :
 | `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET` | Connexion avec Discord | _(désactivée)_ |
 | `FACEBOOK_CLIENT_ID`, `FACEBOOK_CLIENT_SECRET` | Connexion avec Facebook | _(désactivée)_ |
 | `PUBLIC_URL` | Adresse publique du site, pour les URL de rappel de la connexion : `https://co-loto.com` en production (indispensable avec un nom de domaine personnalisé) | `RENDER_EXTERNAL_URL` sur Render (adresse `…onrender.com`), sinon adresse de la requête |
+| `SUPERADMIN_EMAIL` | Adresse email du superadmin de l'espace d'administration (voir « Espace d'administration ») | _(aucun administrateur)_ |
 | `AUTH_DEV_LOGIN` | `1` ajoute un « compte de test » sans fournisseur, pour le développement local (toujours ignoré sur Render) | _(désactivé)_ |
 
 Un fournisseur n'apparaît que si son identifiant **et** son secret sont définis. Sans aucun, le site fonctionne sans compte, comme avant.
 
 Pour essayer la connexion en local sans créer d'application OAuth : `AUTH_DEV_LOGIN=1 npm start`.
+
+Pour essayer l'espace d'administration en local : `AUTH_DEV_LOGIN=1 SUPERADMIN_EMAIL=moi@example.com npm start`, puis ouvrez `http://localhost:3000/auth/dev?nom=Moi&email=moi@example.com` (l'adresse du compte de test compte comme vérifiée).
 
 Pour tester à plusieurs sur une seule machine, ouvrez le lien du salon dans une fenêtre de navigation privée.
 
@@ -255,6 +282,10 @@ Les aperçus de pull request ont une autre adresse : la connexion n'y fonctionne
 5. Passez l'app du mode **Développement** au mode **Live** (en haut de la page) : sans cela, seuls les administrateurs de l'app peuvent se connecter. Les autorisations `email` et `public_profile` ne demandent pas d'examen par Meta.
 
 Co-Loto demande à chaque service l'accès à l'adresse email, pour pouvoir envoyer plus tard les résultats des grilles (uniquement avec l'accord du joueur, donné dans « Mon espace »). Données conservées : le fournisseur, l'identifiant technique qu'il donne, l'adresse email et un pseudo (celui des parties, ou le pseudo GitHub ou Discord ; jamais les vrais nom et prénom). Le joueur modifie son pseudo et son email dans « Mon espace », et peut y supprimer son compte. Le détail est sur la page `/confidentialite` du site.
+
+#### Espace d'administration
+
+Dans Render, ajoutez la variable `SUPERADMIN_EMAIL` avec votre adresse email (**Environment** > **Add Environment Variable**, puis **Save Changes**). Connectez-vous ensuite sur le site avec un fournisseur qui confirme cette adresse (Google, GitHub, Discord ou Facebook) : le menu burger affiche alors les entrées de l'administration. Évitez de modifier votre adresse dans « Mon espace » : une adresse saisie à la main n'est plus considérée comme vérifiée, et le compte perdrait le rôle de superadmin.
 
 #### Base de données Turso (conserver les grilles)
 

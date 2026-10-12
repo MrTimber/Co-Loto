@@ -19,6 +19,8 @@ import {
 } from './game.js';
 import { validateDrawDate } from './drawDate.js';
 import { createAuth } from './auth.js';
+import { createAdmin } from './admin.js';
+import { pageViewTracker } from './stats.js';
 
 const PUBLIC_DIR = fileURLToPath(new URL('../public/', import.meta.url));
 const GAMES_MODULE = fileURLToPath(new URL('./games.js', import.meta.url));
@@ -65,7 +67,10 @@ export function createApp({
   // Derrière le proxy HTTPS de l'hébergeur : nécessaire pour les cookies « Secure ».
   app.set('trust proxy', 1);
   app.use(express.json({ limit: '4kb' }));
-  app.use(createAuth({ store, env, findRoomId: (id) => rooms.get(id)?.id }).router);
+  const auth = createAuth({ store, env, findRoomId: (id) => rooms.get(id)?.id });
+  app.use(auth.router);
+  app.use(createAdmin({ store, currentUser: auth.currentUser, live: () => liveRooms() }).router);
+  app.use(pageViewTracker({ store, env }));
   // Les règles des jeux sont partagées avec le navigateur.
   app.get('/js/games.js', (req, res) => res.sendFile(GAMES_MODULE));
   app.use(express.static(PUBLIC_DIR, { extensions: ['html'] }));
@@ -105,6 +110,7 @@ export function createApp({
       const room = { id, game, tokens: new Map(), sockets: new Set(), offlineTimers: new Map(), closeTimer: null };
       const { playerId, token } = joinAsNewPlayer(room, name);
       rooms.set(id, room);
+      store.countEvent('room_created', game.gameType).catch((err) => console.error('Statistiques indisponibles :', err.message));
       res.status(201).json({ roomId: id, playerId, token });
     } catch (err) {
       res.status(400).json({ error: err.message });
@@ -121,6 +127,21 @@ export function createApp({
 
   const httpServer = createServer(app);
   const io = new Server(httpServer);
+
+  // Salons ouverts en ce moment, pour le tableau de bord de l'administration.
+  function liveRooms() {
+    const byStatus = { lobby: 0, playing: 0, finished: 0 };
+    const byGame = {};
+    let players = 0;
+    for (const { game } of rooms.values()) {
+      if (game.status in byStatus) byStatus[game.status]++;
+      if (game.status !== 'finished') {
+        byGame[game.gameType] = (byGame[game.gameType] ?? 0) + 1;
+        players += game.players.length;
+      }
+    }
+    return { rooms: byStatus, games: byGame, players, connections: io.engine.clientsCount };
+  }
 
   function joinAsNewPlayer(room, name) {
     const playerId = newId(6);
@@ -269,10 +290,10 @@ export function createApp({
     socket.on('disconnect', () => detach(socket));
   });
 
-  const purgeTimer = setInterval(
-    () => store.purgeExpired().catch((err) => console.error('Purge des grilles expirées impossible :', err.message)),
-    6 * 60 * 60_000,
-  );
+  // Purge au démarrage (le service gratuit de Render s'endort souvent), puis toutes les 6 heures.
+  const purge = () => store.purgeExpired().catch((err) => console.error('Purge des grilles expirées impossible :', err.message));
+  purge();
+  const purgeTimer = setInterval(purge, 6 * 60 * 60_000);
   purgeTimer.unref();
   httpServer.on('close', () => {
     clearInterval(purgeTimer);

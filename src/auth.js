@@ -292,6 +292,9 @@ export function createAuth({ store, env = process.env, findRoomId = () => undefi
         email: user.email,
         emailVerified: user.emailVerified,
         emailConsent: user.emailConsent,
+        // Seulement pour un administrateur (rien n'est indiqué aux autres comptes).
+        ...(user.role && { admin: true }),
+        ...(user.role === 'superadmin' && { superadmin: true }),
       },
       providers: providers.map((id) => ({ id, label: PROVIDERS[id]?.label ?? 'Compte de test' })),
     });
@@ -333,5 +336,5 @@ export function createAuth({ store, env = process.env, findRoomId = () => undefi
     res.status(204).end();
   });
 
-  return { router, providers };
+  return { router, providers, currentUser };
 }
