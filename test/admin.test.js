@@ -143,6 +143,10 @@ test('les numéros des grilles sont gardés 3 ans, sans les joueurs', async () =
   assert.deepEqual(loto[0], { day, drawDate: '2026-10-10', numbers: [1, 2, 3, 4, 5], bonus: [6], players: 2, rounds: 7 });
   assert.equal((await store.gridStats({ gameType: 'loto', drawDate: '2026-10-12' })).length, 1);
   assert.deepEqual(await store.statsDrawDates('loto'), [{ date: '2026-10-12', grids: 1 }, { date: '2026-10-10', grids: 1 }]);
+  // Sans date de tirage prévue : compté pour le prochain tirage au moment où la grille est terminée
+  // (vendredi 14 h à Paris : le tirage Euromillions du soir).
+  assert.equal((await store.gridStats({ gameType: 'euromillions', drawDate: '2026-10-09' })).length, 1);
+  assert.deepEqual(await store.statsDrawDates('euromillions'), [{ date: '2026-10-09', grids: 1 }]);
 
   // Après 30 jours, la grille et ses joueurs sont effacés, ses numéros restent.
   await store.purgeExpired(now + GRID_LIFETIME_MS + 86_400_000 * 2);
@@ -150,6 +154,19 @@ test('les numéros des grilles sont gardés 3 ans, sans les joueurs', async () =
   assert.equal((await store.gridStats({ gameType: 'loto', from: day, to: dayOf(now + 86_400_000) })).length, 2);
   await store.purgeExpired(now + STATS_LIFETIME_MS + 1);
   assert.equal((await store.gridStats({ gameType: 'loto', from: day, to: dayOf(now + 86_400_000) })).length, 1);
+  store.close();
+});
+
+test('les grilles déjà comptées reçoivent un tirage pour les statistiques', async () => {
+  const file = join(mkdtempSync(join(tmpdir(), 'coloto-')), 'stats.db');
+  const first = await openStore({ file });
+  await first.saveGrid(grid('a', [1, 2, 3, 4, 5], [6]), Date.UTC(2026, 9, 10, 19)); // samedi 21 h à Paris
+  first.close();
+  const old = new DatabaseSync(file);
+  old.exec('UPDATE grid_stats SET stats_draw_date = NULL');
+  old.close();
+  const store = await openStore({ file });
+  assert.deepEqual(await store.statsDrawDates('loto'), [{ date: '2026-10-12', grids: 1 }]); // tirage du samedi passé : lundi
   store.close();
 });
 

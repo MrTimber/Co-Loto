@@ -443,7 +443,7 @@ async function renderNumbers() {
   const filters = el('div', 'filters', el('label', '', 'Jeu', game), el('label', '', 'Grilles de', mode));
   if (s.mode === 'draw') {
     const draw = el('select');
-    if (!data.drawDates.length) draw.append(el('option', '', 'Aucune grille avec une date de tirage'));
+    if (!data.drawDates.length) draw.append(el('option', '', 'Aucune grille pour ce jeu'));
     for (const d of data.drawDates) {
       const option = el('option', '', `${drawDateLabel(d.date)} (${d.grids})`);
       option.value = d.date;
