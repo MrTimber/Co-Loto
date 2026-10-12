@@ -371,6 +371,7 @@ export function createAuth({ store, env = process.env, mailer = null, findRoomId
         email: user.email,
         emailVerified: user.emailVerified,
         emailConsent: user.emailConsent,
+        ...(user.reviewGrids && { reviewGrids: true }),
         // Seulement pour un administrateur (rien n'est indiqué aux autres comptes).
         ...(user.role && { admin: true }),
         ...(user.role === 'superadmin' && { superadmin: true }),
@@ -414,6 +415,12 @@ export function createAuth({ store, env = process.env, mailer = null, findRoomId
 
   router.delete('/api/compte/grilles/:id', requireUser, async (req, res) => {
     await store.forgetUserGrid(req.user.id, req.params.id);
+    res.status(204).end();
+  });
+
+  // Le joueur a relu les grilles reprises avec son compte : l'avertissement n'est plus affiché.
+  router.delete('/api/compte/grilles-a-verifier', requireUser, async (req, res) => {
+    await store.dismissGridsReview(req.user.id);
     res.status(204).end();
   });
 

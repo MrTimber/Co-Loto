@@ -164,6 +164,8 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .tag.warn { background: var(--pending-soft); color: var(--text); }
 .tag.ok { background: var(--accent-soft); color: var(--text); }
 .banner.warn { background: var(--pending-soft); }
+div.banner > p { margin: 0 0 .5rem; }
+div.banner > .actions { margin: 0; }
 .pick-status { font-size: .85rem; color: var(--muted); }
 .pick-status.done { color: var(--accent); font-weight: 600; }
 

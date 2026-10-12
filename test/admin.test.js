@@ -23,17 +23,26 @@ test('une adresse email = un seul compte ; rôles réservés aux adresses vérif
     needsCode: true,
     email: 'BOSS@example.com',
   });
-  // Adresse vérifiée : rien ne prouve que le compte non vérifié est à la même personne, il perd l'adresse.
+  // Adresse vérifiée : connexion au compte existant, dont l'adresse devient vérifiée. Ses autres
+  // services et ses sessions sont retirés : sans preuve, il faudra désormais un code.
+  const fakeSession = await store.createSession(fake.id, now);
   const boss = await store.upsertUser({ provider: 'google', providerId: 'g', name: 'Boss', email: 'boss@example.com', emailVerified: true }, now + 1);
-  assert.notEqual(boss.id, fake.id);
+  assert.equal(boss.id, fake.id);
   assert.equal(boss.role, 'superadmin');
-  assert.equal(boss.created, true);
-  assert.equal((await store.getUser(fake.id)).email, null);
+  assert.equal(boss.created, false);
+  assert.equal(boss.emailVerified, true);
+  assert.equal(boss.reviewGrids, undefined); // aucune grille à relire
+  assert.deepEqual(boss.providers, ['google']);
+  assert.equal(await store.getSessionUser(fakeSession, now + 1), null);
+  assert.deepEqual(await store.upsertUser({ provider: 'microsoft', providerId: 'm', name: 'Faux', email: 'boss@example.com', emailVerified: false }, now + 1), {
+    needsCode: true,
+    email: 'boss@example.com',
+  });
   // Même adresse vérifiée avec un autre fournisseur : même compte, le fournisseur y est lié.
   const again = await store.upsertUser({ provider: 'github', providerId: 'h', name: 'Boss bis', email: 'BOSS@example.com', emailVerified: true }, now + 2);
   assert.equal(again.id, boss.id);
   assert.equal(again.created, false);
-  assert.equal(again.name, 'Boss');
+  assert.equal(again.name, 'Boss'); // pseudo de la connexion qui a prouvé l'adresse
   assert.deepEqual(again.providers, ['google', 'github']);
   assert.equal((await store.upsertUser({ provider: 'github', providerId: 'h', name: 'x' }, now + 3)).id, boss.id);
   // Après un code bon, la connexion reprend avec une adresse vérifiée : le fournisseur est lié.
@@ -63,7 +72,7 @@ test('une adresse email = un seul compte ; rôles réservés aux adresses vérif
   assert.equal(await store.setAdmin(lulu.id, true), true);
   assert.equal((await store.getUser(lulu.id)).role, 'admin');
   const users = await store.listUsers(now);
-  assert.deepEqual(users.map((u) => u.role ?? null).sort(), ['admin', 'superadmin', null].sort());
+  assert.deepEqual(users.map((u) => u.role).sort(), ['admin', 'superadmin']);
   assert.equal(users.find((u) => u.id === boss.id).lastLoginAt, new Date(now).toISOString());
 
   // Sans variable : aucun superadmin.
@@ -81,28 +90,35 @@ test('mise à niveau : un seul compte par adresse', async () => {
     CREATE TABLE sessions (token_hash TEXT PRIMARY KEY, user_id TEXT NOT NULL, expires_at INTEGER NOT NULL);
     CREATE TABLE grid_players (token_hash TEXT PRIMARY KEY, grid_id TEXT NOT NULL, name TEXT NOT NULL, user_id TEXT);`);
   const insert = old.prepare('INSERT INTO users VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
-  insert.run('u0', 'discord', 'd', 'Squatteur', 'alice@example.com', 0, 0, 0);
+  insert.run('u0', 'discord', 'd', 'Ancien', 'alice@example.com', 0, 0, 0);
   insert.run('u1', 'google', 'g', 'Alice', 'alice@example.com', 1, 0, 1);
   insert.run('u2', 'github', 'h', 'Alice GH', 'Alice@Example.com', 1, 1, 2);
   insert.run('u3', 'microsoft', 'm', 'Moi', 'seule@example.com', 0, 1, 3);
   old.prepare('INSERT INTO grid_players VALUES (?, ?, ?, ?)').run('t', 'g1', 'Alice', 'u2');
+  old.prepare('INSERT INTO grid_players VALUES (?, ?, ?, ?)').run('t0', 'g0', 'Ancien', 'u0');
+  old.prepare('INSERT INTO sessions VALUES (?, ?, ?)').run('s0', 'u0', Date.now() + 100_000);
   old.prepare('INSERT INTO sessions VALUES (?, ?, ?)').run('s', 'u2', Date.now() + 100_000);
   old.close();
 
   const store = await openStore({ file });
   const users = await store.listUsers();
-  assert.equal(users.length, 3);
+  assert.equal(users.length, 2);
   const alice = users.find((u) => u.id === 'u1');
   assert.deepEqual(alice.providers, ['google', 'github']); // comptes vérifiés fusionnés
   assert.equal(alice.emailConsent, true);
-  assert.equal(users.find((u) => u.id === 'u0').email, null); // non vérifié : perd l'adresse
+  // Le compte non vérifié laisse ses grilles, à relire, mais pas son service : il faudra un code.
+  assert.equal(alice.reviewGrids, true);
+  assert.deepEqual(await store.upsertUser({ provider: 'discord', providerId: 'd', name: 'x', email: 'alice@example.com' }), {
+    needsCode: true,
+    email: 'alice@example.com',
+  });
   assert.equal(users.find((u) => u.id === 'u3').email, 'seule@example.com'); // gardée, non vérifiée
   assert.equal(users.find((u) => u.id === 'u3').emailVerified, false);
   assert.equal((await store.upsertUser({ provider: 'github', providerId: 'h', name: 'x' })).id, 'u1');
   store.close();
   // Une seconde ouverture ne change plus rien.
   const reopened = await openStore({ file });
-  assert.equal((await reopened.listUsers()).length, 3);
+  assert.equal((await reopened.listUsers()).length, 2);
   reopened.close();
 });
 
@@ -323,6 +339,28 @@ test('connexion avec une adresse non vérifiée déjà utilisée : code envoyé 
   assert.equal((await json('/api/compte', { cookie: fresh })).user.emailVerified, true);
   assert.equal((await request(`/verifier-email?jeton=${link[1]}`)).headers.get('location'), '/mon-espace?verification=echec');
   assert.equal((await patch({ name: 'Nouveau', emailConsent: true })).status, 200);
+});
+
+test('une adresse prouvée rejoint le compte qui l’avait sans l’avoir vérifiée', async () => {
+  // Quelqu'un crée un compte avec une adresse non vérifiée et y ajoute une grille.
+  const squatter = await login({ nom: 'Usurpateur', email: 'vrai@example.com', verifiee: '0' });
+  await store.saveGrid(grid('gs', [1, 2, 3, 4, 5], [6]));
+  const claim = await request('/api/compte/grilles', { method: 'POST', cookie: squatter, headers: { 'content-type': 'application/json' }, body: JSON.stringify({ gridId: 'gs', token: 't-gs' }) });
+  assert.equal(claim.status, 200);
+  // La vraie propriétaire se connecte avec un service qui a vérifié l'adresse : même compte, adresse vérifiée.
+  const owner = await login({ nom: 'Vraie', email: 'vrai@example.com' });
+  const account = (await json('/api/compte', { cookie: owner })).user;
+  assert.equal(account.emailVerified, true);
+  assert.equal(account.name, 'Vraie');
+  assert.equal(account.reviewGrids, true);
+  assert.deepEqual((await json('/api/compte/grilles', { cookie: owner })).map((g) => g.id), ['gs']);
+  // L'usurpateur perd l'accès : sa session est fermée, et son service demande maintenant un code.
+  assert.equal((await json('/api/compte', { cookie: squatter })).user, null);
+  const again = await request(`/auth/dev?${new URLSearchParams({ nom: 'Usurpateur', email: 'vrai@example.com', verifiee: '0' })}`);
+  assert.equal(again.headers.get('location'), '/code-connexion');
+  // Grilles relues : l'avertissement disparaît.
+  assert.equal((await request('/api/compte/grilles-a-verifier', { method: 'DELETE', cookie: owner })).status, 204);
+  assert.equal((await json('/api/compte', { cookie: owner })).user.reviewGrids, undefined);
 });
 
 test('le rôle admin n’est donné qu’à une adresse vérifiée', async () => {

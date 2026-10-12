@@ -133,6 +133,24 @@ function accountActions(user) {
   ];
 }
 
+// Le compte existait avec cette adresse avant qu'elle soit vérifiée : quelqu'un d'autre a pu
+// l'utiliser et y ajouter des grilles.
+function reviewWarning() {
+  const done = el('button', 'small', 'J’ai vérifié mes grilles');
+  done.type = 'button';
+  const box = el(
+    'div',
+    'banner warn',
+    el('p', '', 'Votre adresse email est maintenant vérifiée, et ce compte l’utilisait déjà. Si quelqu’un d’autre avait utilisé votre adresse, certaines grilles ci-dessous peuvent ne pas être les vôtres : retirez-les avec « Retirer ».'),
+    el('div', 'actions', done),
+  );
+  done.addEventListener('click', async () => {
+    const res = await fetch('/api/compte/grilles-a-verifier', { method: 'DELETE' }).catch(() => null);
+    if (res?.ok) box.remove();
+  });
+  return box;
+}
+
 const { user, providers, emailVerification } = await getAccount();
 const verification = new URLSearchParams(location.search).get('verification');
 if (verification) history.replaceState(null, '', location.pathname);
@@ -144,6 +162,7 @@ if (user) {
   if (verification === 'ok') card.append(el('p', 'banner', '✓ Votre adresse email est vérifiée.'));
   if (verification === 'echec') card.append(el('p', 'banner warn', 'Ce lien de vérification n’est plus valable. Demandez-en un nouveau ci-dessous.'));
   card.append(el('h2', '', 'Mes grilles'));
+  if (user.reviewGrids && grids.length) card.append(reviewWarning());
   if (grids.length) {
     card.append(el('ul', 'my-grids', ...grids.map(gridItem)));
   } else {

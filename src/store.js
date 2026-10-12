@@ -31,6 +31,8 @@ function toUser(row) {
     email: row.email,
     emailVerified: Boolean(row.email && row.email_verified),
     emailConsent: Boolean(row.email_consent),
+    // Des grilles viennent d'un compte à l'adresse non vérifiée : certaines peuvent être à quelqu'un d'autre.
+    ...(row.review_grids && { reviewGrids: true }),
     // Seulement pour un administrateur : 'superadmin' ou 'admin'.
     ...(row.role && { role: row.role }),
   };
@@ -51,11 +53,15 @@ function toGrid(row) {
 }
 
 // Mise à niveau des comptes : une adresse email n'appartient qu'à un compte. Pour chaque adresse
-// partagée, le compte gardé est le plus ancien qui l'a vérifiée (sinon le plus ancien) ; les autres
-// comptes qui l'ont vérifiée y sont fusionnés (fournisseurs, grilles, sessions, rôle), ceux qui ne
-// l'ont pas vérifiée la perdent (rien ne prouve qu'ils appartiennent à la même personne).
-async function mergeAccountsByEmail(db) {
-  await db.execute('INSERT OR IGNORE INTO user_logins (provider, provider_id, user_id, created_at) SELECT provider, provider_id, id, created_at FROM users');
+// partagée, le compte gardé est le plus ancien qui l'a vérifiée (sinon le plus ancien). Les autres
+// comptes qui l'ont vérifiée y sont fusionnés (fournisseurs, grilles, sessions, rôle). Ceux qui ne
+// l'ont pas vérifiée y laissent leurs grilles, mais pas leurs fournisseurs ni leurs sessions : sans
+// preuve, ils devront entrer un code envoyé à l'adresse. Sans compte vérifié, seul le plus ancien
+// garde l'adresse.
+async function mergeAccountsByEmail(db, firstRun) {
+  if (firstRun) {
+    await db.execute('INSERT OR IGNORE INTO user_logins (provider, provider_id, user_id, created_at) SELECT provider, provider_id, id, created_at FROM users');
+  }
   const { rows } = await db.execute(
     `SELECT id, lower(email) AS address, email_verified, is_admin, email_consent FROM users
     WHERE lower(email) IN (SELECT lower(email) FROM users WHERE email IS NOT NULL GROUP BY lower(email) HAVING COUNT(*) > 1)
@@ -65,19 +71,32 @@ async function mergeAccountsByEmail(db) {
   for (const row of rows) {
     const keep = keepers.get(row.address);
     if (!keep) {
-      keepers.set(row.address, row.id);
+      keepers.set(row.address, { id: row.id, verified: Boolean(row.email_verified) });
+      continue;
+    }
+    if (!row.email_verified && !keep.verified) {
+      await db.execute({ sql: 'UPDATE users SET email = NULL, email_consent = 0 WHERE id = ?', args: [row.id] });
       continue;
     }
     if (!row.email_verified) {
-      await db.execute({ sql: 'UPDATE users SET email = NULL, email_consent = 0 WHERE id = ?', args: [row.id] });
+      await db.batch(
+        [
+          { sql: 'UPDATE users SET review_grids = 1 WHERE id = ? AND EXISTS (SELECT 1 FROM grid_players WHERE user_id = ?)', args: [keep.id, row.id] },
+          { sql: 'UPDATE OR IGNORE grid_players SET user_id = ? WHERE user_id = ?', args: [keep.id, row.id] },
+          { sql: 'DELETE FROM user_logins WHERE user_id = ?', args: [row.id] },
+          { sql: 'DELETE FROM sessions WHERE user_id = ?', args: [row.id] },
+          { sql: 'DELETE FROM users WHERE id = ?', args: [row.id] },
+        ],
+        'write',
+      );
       continue;
     }
     await db.batch(
       [
-        { sql: 'UPDATE user_logins SET user_id = ? WHERE user_id = ?', args: [keep, row.id] },
-        { sql: 'UPDATE OR IGNORE grid_players SET user_id = ? WHERE user_id = ?', args: [keep, row.id] },
-        { sql: 'UPDATE sessions SET user_id = ? WHERE user_id = ?', args: [keep, row.id] },
-        { sql: 'UPDATE users SET is_admin = MAX(is_admin, ?), email_consent = MAX(email_consent, ?) WHERE id = ?', args: [row.is_admin, row.email_consent, keep] },
+        { sql: 'UPDATE user_logins SET user_id = ? WHERE user_id = ?', args: [keep.id, row.id] },
+        { sql: 'UPDATE OR IGNORE grid_players SET user_id = ? WHERE user_id = ?', args: [keep.id, row.id] },
+        { sql: 'UPDATE sessions SET user_id = ? WHERE user_id = ?', args: [keep.id, row.id] },
+        { sql: 'UPDATE users SET is_admin = MAX(is_admin, ?), email_consent = MAX(email_consent, ?) WHERE id = ?', args: [row.is_admin, row.email_consent, keep.id] },
         { sql: 'DELETE FROM users WHERE id = ?', args: [row.id] },
       ],
       'write',
@@ -124,6 +143,7 @@ export async function openStore({ url, authToken, file = ':memory:', superadminE
   const columns = new Set((await run('PRAGMA table_info(grids)')).rows.map((c) => c.name));
   if (!columns.has('game_type')) await run("ALTER TABLE grids ADD COLUMN game_type TEXT NOT NULL DEFAULT 'loto'");
   if (!columns.has('bonus')) await run('ALTER TABLE grids ADD COLUMN bonus TEXT');
+  const loginsExisted = Boolean(await first("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'user_logins'"));
   const gridStatsExisted = Boolean(await first("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'grid_stats'"));
   // Comptes : pseudo et email (jamais le vrai nom). L'adresse email vient toujours d'un fournisseur
   // de connexion et identifie le compte : un seul compte peut l'avoir. `email_verified` : adresse
@@ -213,7 +233,9 @@ export async function openStore({ url, authToken, file = ':memory:', superadminE
   const userColumns = new Set((await run('PRAGMA table_info(users)')).rows.map((c) => c.name));
   if (!userColumns.has('is_admin')) await run('ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0');
   if (!userColumns.has('last_login_at')) await run('ALTER TABLE users ADD COLUMN last_login_at INTEGER');
-  await mergeAccountsByEmail(db);
+  // Grilles reprises avec un compte à l'adresse non vérifiée : le joueur est invité à les relire.
+  if (!userColumns.has('review_grids')) await run('ALTER TABLE users ADD COLUMN review_grids INTEGER NOT NULL DEFAULT 0');
+  await mergeAccountsByEmail(db, !loginsExisted);
   // Première mise en place des statistiques : les grilles encore conservées y sont reprises.
   if (!gridStatsExisted) {
     const { rows } = await run('SELECT * FROM grids');
@@ -225,7 +247,7 @@ export async function openStore({ url, authToken, file = ':memory:', superadminE
   const superadmin = typeof superadminEmail === 'string' && superadminEmail.trim() ? superadminEmail.trim() : null;
   const USER_COLUMNS = `users.id, users.provider, users.name, users.email, users.email_consent,
     (SELECT group_concat(provider) FROM (SELECT provider FROM user_logins WHERE user_id = users.id ORDER BY created_at, provider)) AS providers,
-    users.email_verified,
+    users.email_verified, users.review_grids,
     -- Un rôle n'est effectif qu'avec une adresse vérifiée.
     CASE
       WHEN users.email_verified = 0 THEN NULL
@@ -292,10 +314,12 @@ export async function openStore({ url, authToken, file = ':memory:', superadminE
     },
     // Connexion avec un fournisseur.
     // 1. Fournisseur déjà lié à un compte : ce compte.
-    // 2. Un compte a déjà cette adresse : si elle est vérifiée des deux côtés, le fournisseur y est lié.
-    //    Si le fournisseur ne l'a pas vérifiée, renvoie { needsCode: true } : la connexion attend un code
-    //    envoyé à cette adresse (puis reprend avec emailVerified). Si seul le compte existant ne l'a pas
-    //    vérifiée, rien ne prouve qu'il appartient à la même personne : il perd l'adresse.
+    // 2. Un compte a déjà cette adresse : si le fournisseur ne l'a pas vérifiée, renvoie
+    //    { needsCode: true } : la connexion attend un code envoyé à cette adresse (puis reprend avec
+    //    emailVerified). Sinon le fournisseur est lié à ce compte, dont l'adresse devient vérifiée.
+    //    Si elle ne l'était pas, ses autres fournisseurs et ses sessions sont retirés : seul celui qui
+    //    prouve posséder l'adresse peut encore y accéder. S'il a des grilles, le joueur est invité à
+    //    retirer celles qui ne sont pas les siennes (un usurpateur aurait pu en ajouter).
     // 3. Sinon le compte `linkTo` (joueur déjà connecté qui ajoute un fournisseur), ou un nouveau compte.
     // `created` : nouveau compte.
     async upsertUser({ provider, providerId, name, email = null, emailVerified = false, linkTo = null }, now = Date.now()) {
@@ -305,8 +329,19 @@ export async function openStore({ url, authToken, file = ':memory:', superadminE
       if (!userId) {
         const holder = email ? await userByEmail(email) : null;
         if (holder && !verified) return { needsCode: true, email };
-        if (holder && holder.email_verified) userId = holder.id;
-        else if (holder) await run('UPDATE users SET email = NULL, email_verified = 0, email_consent = 0 WHERE id = ?', holder.id);
+        if (holder && !holder.email_verified && holder.id !== linkTo) {
+          await db.batch(
+            [
+              { sql: 'DELETE FROM user_logins WHERE user_id = ?', args: [holder.id] },
+              { sql: 'DELETE FROM sessions WHERE user_id = ?', args: [holder.id] },
+              { sql: 'DELETE FROM email_tokens WHERE user_id = ?', args: [holder.id] },
+              // Le pseudo aussi pouvait venir de quelqu'un d'autre : celui de cette connexion le remplace.
+              { sql: 'UPDATE users SET name = ?, review_grids = EXISTS (SELECT 1 FROM grid_players WHERE user_id = ?) WHERE id = ?', args: [name, holder.id, holder.id] },
+            ],
+            'write',
+          );
+        }
+        if (holder) userId = holder.id;
         userId ??= linkTo && (await selectUser(linkTo))?.id;
         if (!userId) {
           userId = randomUUID();
@@ -335,6 +370,9 @@ export async function openStore({ url, authToken, file = ':memory:', superadminE
     },
     // Pseudo et accord d'envoi des résultats (qui demande une adresse vérifiée). L'adresse, elle,
     // vient toujours du fournisseur de connexion.
+    async dismissGridsReview(id) {
+      await run('UPDATE users SET review_grids = 0 WHERE id = ?', id);
+    },
     async updateUser(id, { name, emailConsent }) {
       await run(
         'UPDATE users SET name = ?, email_consent = CASE WHEN email IS NOT NULL AND email_verified = 1 THEN ? ELSE 0 END WHERE id = ?',
