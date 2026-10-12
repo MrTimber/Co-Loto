@@ -1,28 +1,44 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
+import { DatabaseSync } from 'node:sqlite';
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { createApp } from '../src/app.js';
 import { openStore, GRID_LIFETIME_MS, STATS_LIFETIME_MS, dayOf } from '../src/store.js';
 import { pagePath, deviceOf, referrerHost, isBot } from '../src/stats.js';
 
 const grid = (id, numbers, bonus, extra = {}) => ({ id, numbers, bonus, players: ['Alice', 'Bob'], rounds: 7, participants: [{ token: `t-${id}`, name: 'Alice' }], ...extra });
 
-test('le superadmin est le plus ancien compte qui a son adresse, vérifiée', async () => {
+test('une adresse email = un seul compte, quel que soit le fournisseur ; le superadmin est ce compte', async () => {
   const store = await openStore({ superadminEmail: 'Boss@Example.com' });
   const now = Date.UTC(2026, 9, 9);
-  // Adresse non vérifiée (Microsoft, ou modifiée à la main) : jamais superadmin.
+  // Adresse non vérifiée (compte Microsoft professionnel…) : ignorée, donc jamais superadmin.
   const fake = await store.upsertUser({ provider: 'microsoft', providerId: 'm', name: 'Faux', email: 'boss@example.com', emailVerified: false }, now);
+  assert.equal(fake.email, null);
   assert.equal(fake.role, undefined);
   const boss = await store.upsertUser({ provider: 'google', providerId: 'g', name: 'Boss', email: 'boss@example.com', emailVerified: true }, now + 1);
   assert.equal(boss.role, 'superadmin');
   assert.equal(boss.created, true);
-  const second = await store.upsertUser({ provider: 'github', providerId: 'h', name: 'Boss bis', email: 'BOSS@example.com', emailVerified: true }, now + 2);
-  assert.equal(second.role, undefined); // un seul superadmin
-  assert.equal((await store.upsertUser({ provider: 'google', providerId: 'g', name: 'Boss' }, now + 3)).created, false);
+  // Même adresse avec un autre fournisseur : même compte, le fournisseur y est lié.
+  const again = await store.upsertUser({ provider: 'github', providerId: 'h', name: 'Boss bis', email: 'BOSS@example.com', emailVerified: true }, now + 2);
+  assert.equal(again.id, boss.id);
+  assert.equal(again.created, false);
+  assert.equal(again.name, 'Boss');
+  assert.deepEqual(again.providers, ['google', 'github']);
+  assert.equal((await store.upsertUser({ provider: 'github', providerId: 'h', name: 'x' }, now + 3)).id, boss.id);
 
-  assert.equal(await store.setAdmin(second.id, true), true);
-  assert.equal((await store.getUser(second.id)).role, 'admin');
+  // Un joueur connecté sans adresse qui se connecte avec un autre service : le service est lié, l'adresse ajoutée.
+  const lulu = await store.upsertUser({ provider: 'discord', providerId: 'd', name: 'Lulu' }, now);
+  const linked = await store.upsertUser({ provider: 'facebook', providerId: 'f', name: 'x', email: 'lulu@example.com', emailVerified: true, linkTo: lulu.id }, now + 4);
+  assert.equal(linked.id, lulu.id);
+  assert.equal(linked.email, 'lulu@example.com');
+
+  assert.equal(await store.setAdmin(fake.id, true), true);
+  assert.equal((await store.getUser(fake.id)).role, 'admin');
   const users = await store.listUsers(now);
-  assert.deepEqual(users.map((u) => u.role ?? null), ['admin', 'superadmin', null]); // du plus récent au plus ancien
+  assert.equal(users.length, 3);
+  assert.deepEqual(users.map((u) => u.role ?? null).sort(), ['admin', 'superadmin', null].sort());
   assert.equal(users.find((u) => u.id === boss.id).lastLoginAt, new Date(now + 3).toISOString());
 
   // Sans variable : aucun superadmin.
@@ -30,6 +46,36 @@ test('le superadmin est le plus ancien compte qui a son adresse, vérifiée', as
   assert.equal((await plain.upsertUser({ provider: 'google', providerId: 'g', name: 'Boss', email: 'boss@example.com', emailVerified: true })).role, undefined);
   store.close();
   plain.close();
+});
+
+test('mise à niveau : adresses non vérifiées retirées, comptes de même adresse fusionnés', async () => {
+  const file = join(mkdtempSync(join(tmpdir(), 'coloto-')), 'comptes.db');
+  const old = new DatabaseSync(file);
+  old.exec(`CREATE TABLE users (id TEXT PRIMARY KEY, provider TEXT NOT NULL, provider_id TEXT NOT NULL, name TEXT NOT NULL, email TEXT,
+    email_verified INTEGER NOT NULL DEFAULT 0, email_consent INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL, UNIQUE (provider, provider_id));
+    CREATE TABLE sessions (token_hash TEXT PRIMARY KEY, user_id TEXT NOT NULL, expires_at INTEGER NOT NULL);
+    CREATE TABLE grid_players (token_hash TEXT PRIMARY KEY, grid_id TEXT NOT NULL, name TEXT NOT NULL, user_id TEXT);`);
+  const insert = old.prepare('INSERT INTO users VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
+  insert.run('u1', 'google', 'g', 'Alice', 'alice@example.com', 1, 0, 1);
+  insert.run('u2', 'github', 'h', 'Alice GH', 'Alice@Example.com', 1, 1, 2);
+  insert.run('u3', 'microsoft', 'm', 'Moi', 'saisie@example.com', 0, 1, 3);
+  old.prepare('INSERT INTO grid_players VALUES (?, ?, ?, ?)').run('t', 'g1', 'Alice', 'u2');
+  old.prepare('INSERT INTO sessions VALUES (?, ?, ?)').run('s', 'u2', Date.now() + 100_000);
+  old.close();
+
+  const store = await openStore({ file });
+  const users = await store.listUsers();
+  assert.equal(users.length, 2);
+  const alice = users.find((u) => u.id === 'u1');
+  assert.deepEqual(alice.providers, ['google', 'github']);
+  assert.equal(alice.emailConsent, true);
+  assert.equal(users.find((u) => u.id === 'u3').email, null);
+  assert.equal((await store.upsertUser({ provider: 'github', providerId: 'h', name: 'x' })).id, 'u1');
+  store.close();
+  // Une seconde ouverture ne change plus rien.
+  const reopened = await openStore({ file });
+  assert.equal((await reopened.listUsers()).length, 2);
+  reopened.close();
 });
 
 test('les numéros des grilles sont gardés 3 ans, sans les joueurs', async () => {
@@ -126,7 +172,7 @@ test('un visiteur ou un joueur classique ne voit rien de l’administration', as
     }
   }
   const account = await json('/api/compte', { cookie: player });
-  assert.deepEqual(Object.keys(account.user).sort(), ['email', 'emailConsent', 'emailVerified', 'name', 'provider']);
+  assert.deepEqual(Object.keys(account.user).sort(), ['email', 'emailConsent', 'name', 'provider', 'providers']);
   // Les scripts publics ne contiennent pas les entrées du menu d'administration.
   assert.doesNotMatch(await (await request('/js/header.js')).text(), /Tableau de bord|Utilisateurs|Fréquentation/);
 });

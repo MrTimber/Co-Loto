@@ -11,6 +11,8 @@ const OAUTH_MAX_AGE_MS = 10 * 60_000;
 const NAME_MAX_LENGTH = 24; // comme le pseudo des parties
 const EMAIL_MAX_LENGTH = 254;
 const FACEBOOK_API_VERSION = 'v23.0';
+// Annuaire des comptes Microsoft personnels (outlook.com, hotmail.com…), dont l'adresse est vérifiée par Microsoft.
+const MICROSOFT_CONSUMER_TENANT = '9188040d-6c67-4c5b-b112-36a304b66dad';
 
 async function getJson(fetchImpl, url, accessToken) {
   const res = await fetchImpl(url, { headers: { authorization: `Bearer ${accessToken}`, 'user-agent': 'Co-Loto', accept: 'application/json' } });
@@ -41,9 +43,10 @@ export const PROVIDERS = {
     server: { discovery: (env) => `https://login.microsoftonline.com/${env.MICROSOFT_TENANT || 'common'}/v2.0` },
     scopes: 'openid email',
     profile: async (tokens) => {
-      // Microsoft ne garantit pas que l'adresse a été vérifiée : elle est gardée comme non vérifiée.
+      // Seule l'adresse d'un compte personnel est vérifiée par Microsoft ; celle d'un compte
+      // professionnel peut être saisie librement par l'administrateur de l'annuaire : elle est ignorée.
       const claims = tokens.claims();
-      return { id: claims.sub, email: typeof claims.email === 'string' ? claims.email : null, emailVerified: false };
+      return { id: claims.sub, email: verifiedEmail(claims.email, claims.tid === MICROSOFT_CONSUMER_TENANT) };
     },
   },
   github: {
@@ -194,8 +197,10 @@ export function createAuth({ store, env = process.env, findRoomId = () => undefi
 
   // Pseudo d'un nouveau compte : celui du fournisseur s'il en a un (GitHub, Discord),
   // sinon celui que le joueur utilise déjà dans ses parties.
-  async function logIn(req, res, { provider, providerId, pseudo, email = null, emailVerified = Boolean(email) }) {
-    const user = await store.upsertUser({ provider, providerId, name: cleanName(pseudo) || 'Joueur', email, emailVerified });
+  // Un joueur déjà connecté qui se connecte avec un autre fournisseur lui lie ce fournisseur.
+  async function logIn(req, res, { provider, providerId, pseudo, email = null }) {
+    const linkTo = (await currentUser(req))?.id;
+    const user = await store.upsertUser({ provider, providerId, name: cleanName(pseudo) || 'Joueur', email, emailVerified: Boolean(email), linkTo });
     res.cookie(SESSION_COOKIE, await store.createSession(user.id), cookieOptions(req, 30 * 24 * 60 * 60_000));
   }
 
@@ -266,7 +271,6 @@ export function createAuth({ store, env = process.env, findRoomId = () => undefi
         providerId: profile.id,
         pseudo: cleanName(profile.pseudo) || cleanName(pending.pseudo),
         email: isEmail(profile.email) ? profile.email : null,
-        emailVerified: profile.emailVerified,
       });
       res.redirect(retour);
     } catch (err) {
@@ -289,8 +293,8 @@ export function createAuth({ store, env = process.env, findRoomId = () => undefi
       user: user && {
         name: user.name,
         provider: user.provider,
+        providers: user.providers,
         email: user.email,
-        emailVerified: user.emailVerified,
         emailConsent: user.emailConsent,
         // Seulement pour un administrateur (rien n'est indiqué aux autres comptes).
         ...(user.role && { admin: true }),
@@ -300,15 +304,16 @@ export function createAuth({ store, env = process.env, findRoomId = () => undefi
     });
   });
 
-  // Modification du pseudo, de l'email et de l'accord pour recevoir les résultats.
+  // Modification du pseudo et de l'accord pour recevoir les résultats. L'adresse email, elle,
+  // vient du fournisseur de connexion et ne se modifie pas.
   router.patch('/api/compte', requireUser, async (req, res) => {
-    const { name, email = '', emailConsent = false } = req.body ?? {};
+    const { name, emailConsent = false } = req.body ?? {};
     const pseudo = cleanName(name);
     if (!pseudo) return res.status(400).json({ error: 'Choisissez un pseudo.' });
-    const address = typeof email === 'string' ? email.trim() : '';
-    if (address && !isEmail(address)) return res.status(400).json({ error: 'Cette adresse email ne semble pas valide.' });
-    if (emailConsent === true && !address) return res.status(400).json({ error: 'Indiquez une adresse email pour recevoir les résultats.' });
-    await store.updateUser(req.user.id, { name: pseudo, email: address || null, emailConsent: emailConsent === true });
+    if (emailConsent === true && !req.user.email) {
+      return res.status(400).json({ error: 'Votre compte n’a pas d’adresse email : connectez-vous avec un service qui la fournit pour recevoir les résultats.' });
+    }
+    await store.updateUser(req.user.id, { name: pseudo, emailConsent: emailConsent === true });
     res.json({ ok: true });
   });
 

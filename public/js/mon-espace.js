@@ -33,22 +33,37 @@ function gridItem(grid) {
   return item;
 }
 
-function profileForm(user) {
+const providerNames = (ids) => ids.map((id) => PROVIDER_NAMES[id] ?? id).join(', ');
+
+// L'adresse email vient du service de connexion : affichée, jamais modifiable.
+function emailInfo(user, providers) {
+  if (user.email) {
+    return el('div', 'field', el('p', 'field-label', 'Adresse email'), el('p', 'field-value', user.email), el('p', 'small muted', 'Fournie par le service de connexion, elle identifie votre compte.'));
+  }
+  const others = providers.filter((p) => !user.providers.includes(p.id));
+  return el(
+    'div',
+    'field',
+    el('p', 'field-label', 'Adresse email'),
+    el('p', 'small muted', 'Votre compte n’a pas d’adresse email : le service utilisé ne l’a pas fournie ou ne l’a pas vérifiée. Connectez-vous ici avec un autre service pour l’ajouter.'),
+    others.length ? providerButtons(others, '/mon-espace') : '',
+  );
+}
+
+function profileForm(user, providers) {
   const form = el('form', 'profile');
   const field = (label, input) => el('label', '', label, input);
   const name = el('input');
   Object.assign(name, { name: 'name', required: true, maxLength: 24, autocomplete: 'nickname', value: user.name });
-  const email = el('input');
-  Object.assign(email, { name: 'email', type: 'email', maxLength: 254, autocomplete: 'email', value: user.email ?? '' });
   const consent = el('input');
-  Object.assign(consent, { name: 'emailConsent', type: 'checkbox', checked: user.emailConsent });
+  Object.assign(consent, { name: 'emailConsent', type: 'checkbox', checked: user.emailConsent, disabled: !user.email });
   const status = el('output', 'small');
   const save = el('button', 'primary', 'Enregistrer');
   save.type = 'submit';
   form.append(
     el('h2', '', 'Mon compte'),
     field('Pseudo', name),
-    field('Adresse email', email),
+    emailInfo(user, providers),
     el('label', 'inline', consent, ' M\u2019envoyer par email le résultat de mes grilles qui ont une date de tirage'),
     el('p', 'small muted', 'L\u2019envoi des résultats arrivera dans une prochaine version. Vous pouvez retirer cet accord à tout moment.'),
     el('div', 'actions', save, status),
@@ -59,7 +74,7 @@ function profileForm(user) {
     const res = await fetch('/api/compte', {
       method: 'PATCH',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ name: name.value, email: email.value, emailConsent: consent.checked }),
+      body: JSON.stringify({ name: name.value, emailConsent: consent.checked }),
     }).catch(() => null);
     const body = await res?.json().catch(() => ({}));
     if (res?.ok) {
@@ -90,7 +105,7 @@ function accountActions(user) {
   const privacy = el('a', '', 'Confidentialité');
   privacy.href = '/confidentialite';
   return [
-    el('p', 'small muted', `Connecté avec ${PROVIDER_NAMES[user.provider] ?? user.provider}. `, privacy),
+    el('p', 'small muted', `Connexion avec ${providerNames(user.providers)}. `, privacy),
     el('div', 'actions', logout),
     el('div', 'danger-zone', remove),
   ];
@@ -107,7 +122,7 @@ if (user) {
   } else {
     card.append(el('p', 'muted', 'Aucune grille pour l’instant. Les grilles que vous co-créez en étant connecté apparaissent ici pendant 30 jours.'));
   }
-  card.append(profileForm(user), ...accountActions(user));
+  card.append(profileForm(user, providers), ...accountActions(user));
 } else {
   card.replaceChildren(
     el('h1', '', 'Mon espace'),

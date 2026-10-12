@@ -59,7 +59,7 @@ Le jeu est choisi à la création du salon :
 
 - Les joueurs jouent la grille co-créée comme ils le souhaitent : en point de vente, sur le site de la FDJ, chacun de leur côté, ou ensemble en partageant les gains.
 - La grille reste consultable **30 jours** après sa création grâce à l'**URL unique** de la partie (`/grille/...`), que l'on peut copier ou partager depuis l'écran de fin.
-- Un joueur connecté retrouve toutes ses grilles dans **« Mon espace »**, où il peut aussi modifier son pseudo et son adresse email, accepter de recevoir les résultats par email, et supprimer son compte. Un joueur qui a joué sans compte se voit proposer, à la fin de la partie, de se connecter : la grille qu'il vient de co-créer est alors ajoutée à son espace.
+- Un joueur connecté retrouve toutes ses grilles dans **« Mon espace »**, où il voit son adresse email, peut modifier son pseudo, accepter de recevoir les résultats par email, et supprimer son compte. Un joueur qui a joué sans compte se voit proposer, à la fin de la partie, de se connecter : la grille qu'il vient de co-créer est alors ajoutée à son espace.
 - Si une date de tirage a été indiquée, elle s'affiche sur la page de la grille. À terme, le résultat de la grille sera évalué à la publication des résultats officiels et affiché sur cette page, et les joueurs qui ont renseigné leur adresse email et donné leur accord le **recevront par email** (pas encore disponible, voir « Prochaines étapes »).
 
 ## Fonctionnalités
@@ -100,7 +100,7 @@ Le jeu est choisi à la création du salon :
 
 Réservé aux administrateurs, il est accessible depuis le menu burger, qu'un administrateur connecté voit toujours, même sur grand écran. Pour tout autre visiteur, ses pages, ses scripts et son API n'existent pas (erreur 404) et le menu reste le menu habituel.
 
-- **Superadmin** : il y en a un seul, désigné par la variable d'environnement `SUPERADMIN_EMAIL`. C'est le compte (le plus ancien, s'il y en a plusieurs) dont l'adresse email est celle-ci **et a été vérifiée par le fournisseur de connexion** : Google, GitHub, Discord ou Facebook. Une adresse saisie à la main dans « Mon espace », ou reçue de Microsoft, n'est pas considérée comme vérifiée et ne suffit donc pas. Le compte n'a pas besoin d'exister à l'avance : il devient superadmin à sa première connexion. Son rôle ne peut pas lui être retiré ; seul un changement de la variable désigne un autre superadmin.
+- **Superadmin** : il y en a un seul, désigné par la variable d'environnement `SUPERADMIN_EMAIL`. C'est le compte qui a cette adresse email (une adresse n'appartient qu'à un compte, voir « Un compte par adresse email »). Le compte n'a pas besoin d'exister à l'avance : il devient superadmin à sa première connexion avec un service qui fournit cette adresse. Son rôle ne peut pas lui être retiré ; seul un changement de la variable désigne un autre superadmin.
 - **Administrateurs** : le superadmin nomme ou retire les administrateurs depuis la page « Utilisateurs ».
 
 Pages :
@@ -108,7 +108,7 @@ Pages :
 | Page | Contenu |
 |---|---|
 | `/admin` (tableau de bord) | Salons et joueurs en ce moment, visites, salons créés, grilles co-créées, comptes, grilles par jeu (joueurs et tours en moyenne) |
-| `/admin/utilisateurs` | Liste des comptes (pseudo, fournisseur, email, inscription, dernière connexion, rôle), recherche, grilles co-créées par chacun, nomination des administrateurs |
+| `/admin/utilisateurs` | Liste des comptes (pseudo, services de connexion liés, email, inscription, dernière connexion, rôle), recherche, grilles co-créées par chacun, nomination des administrateurs |
 | `/admin/frequentation` | Visiteurs et pages vues par jour (ou par semaine), grilles co-créées, pages les plus vues, sites d'origine, appareils, salons et grilles par jeu, inscriptions et connexions par fournisseur, sur 7 jours à 12 mois |
 | `/admin/numeros` | Numéros et numéros complémentaires les plus joués pour chaque jeu, sur une période d'un jour à un an, ou pour un tirage précis |
 
@@ -281,11 +281,13 @@ Les aperçus de pull request ont une autre adresse : la connexion n'y fonctionne
 4. **Paramètres de l'app** > **Général** : renseignez l'URL de la politique de confidentialité (`https://co-loto.com/confidentialite`) et, pour la suppression des données, la même page (elle explique comment supprimer son compte depuis « Mon espace »). Copiez l'**ID de l'app** dans `FACEBOOK_CLIENT_ID` et la **clé secrète** dans `FACEBOOK_CLIENT_SECRET`.
 5. Passez l'app du mode **Développement** au mode **Live** (en haut de la page) : sans cela, seuls les administrateurs de l'app peuvent se connecter. Les autorisations `email` et `public_profile` ne demandent pas d'examen par Meta.
 
-Co-Loto demande à chaque service l'accès à l'adresse email, pour pouvoir envoyer plus tard les résultats des grilles (uniquement avec l'accord du joueur, donné dans « Mon espace »). Données conservées : le fournisseur, l'identifiant technique qu'il donne, l'adresse email et un pseudo (celui des parties, ou le pseudo GitHub ou Discord ; jamais les vrais nom et prénom). Le joueur modifie son pseudo et son email dans « Mon espace », et peut y supprimer son compte. Le détail est sur la page `/confidentialite` du site.
+Co-Loto demande à chaque service l'accès à l'adresse email, pour pouvoir envoyer plus tard les résultats des grilles (uniquement avec l'accord du joueur, donné dans « Mon espace »). Données conservées : le fournisseur, l'identifiant technique qu'il donne, l'adresse email et un pseudo (celui des parties, ou le pseudo GitHub ou Discord ; jamais les vrais nom et prénom). Le joueur modifie son pseudo dans « Mon espace », et peut y supprimer son compte.
+
+**Un compte par adresse email.** L'adresse email identifie le compte : elle vient toujours du service de connexion, qui l'a vérifiée, et ne se modifie pas dans « Mon espace ». Se connecter avec un autre service qui donne la même adresse ouvre le même compte (le service y est alors lié). Les adresses non vérifiées sont ignorées : celle d'un compte Microsoft professionnel (seuls les comptes Microsoft personnels, outlook.com, hotmail.com…, ont une adresse vérifiée), ou celle d'un compte GitHub ou Discord qui ne l'a pas confirmée. Un compte sans adresse peut en recevoir une en se connectant, depuis « Mon espace », avec un service qui la fournit. Au premier démarrage de cette version, les adresses non vérifiées déjà enregistrées sont retirées, et les comptes qui avaient la même adresse sont fusionnés dans le plus ancien (fournisseurs, grilles et rôle compris). Le détail est sur la page `/confidentialite` du site.
 
 #### Espace d'administration
 
-Dans Render, ajoutez la variable `SUPERADMIN_EMAIL` avec votre adresse email (**Environment** > **Add Environment Variable**, puis **Save Changes**). Connectez-vous ensuite sur le site avec un fournisseur qui confirme cette adresse (Google, GitHub, Discord ou Facebook) : le menu burger affiche alors les entrées de l'administration. Évitez de modifier votre adresse dans « Mon espace » : une adresse saisie à la main n'est plus considérée comme vérifiée, et le compte perdrait le rôle de superadmin.
+Dans Render, ajoutez la variable `SUPERADMIN_EMAIL` avec votre adresse email (**Environment** > **Add Environment Variable**, puis **Save Changes**). Connectez-vous ensuite sur le site avec un service qui fournit cette adresse : le menu burger affiche alors les entrées de l'administration.
 
 #### Base de données Turso (conserver les grilles)
 

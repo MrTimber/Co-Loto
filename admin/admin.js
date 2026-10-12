@@ -215,8 +215,8 @@ function userGrids(grids) {
 
 function userItem(user, { canManage }) {
   const details = [
-    PROVIDERS[user.provider] ?? user.provider,
-    user.email ? `${user.email}${user.emailVerified ? ' (vérifiée)' : ' (non vérifiée)'}` : 'sans email',
+    user.providers.map((p) => PROVIDERS[p] ?? p).join(', '),
+    user.email ?? 'sans email',
     user.emailConsent ? 'accepte les résultats par email' : null,
     `inscrit le ${longDate(user.createdAt)}`,
     user.lastLoginAt ? `dernière connexion le ${longDate(user.lastLoginAt)}` : null,
@@ -230,7 +230,7 @@ function userItem(user, { canManage }) {
   const status = el('p', 'small error');
   status.setAttribute('role', 'alert');
   const item = el('li', 'user', el('p', 'user-name', user.name, ' ', roleTag(user)), el('p', 'small muted', details.join(' · ')), actions, status, gridsBox);
-  item.dataset.search = `${user.name} ${user.email ?? ''} ${user.provider}`.toLowerCase();
+  item.dataset.search = `${user.name} ${user.email ?? ''} ${user.providers.join(' ')}`.toLowerCase();
 
   gridsButton.addEventListener('click', async () => {
     const open = gridsBox.hidden;
@@ -293,7 +293,7 @@ async function renderUsers() {
         'p',
         'small muted',
         superadminEmail
-          ? `Superadmin : ${superadminEmail}${superadminExists ? '' : ' (son compte n’existe pas encore : il le deviendra à sa première connexion avec cette adresse, vérifiée par le fournisseur)'}.`
+          ? `Superadmin : ${superadminEmail}${superadminExists ? '' : ' (son compte n’existe pas encore : il sera créé à sa première connexion avec un service qui fournit cette adresse)'}.`
           : 'Aucun superadmin défini (variable SUPERADMIN_EMAIL).',
         canManage ? ' Vous pouvez nommer ou retirer les administrateurs.' : ' Seul le superadmin peut nommer ou retirer les administrateurs.',
       ),

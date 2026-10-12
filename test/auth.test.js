@@ -13,24 +13,25 @@ test('comptes, sessions et grilles rattachées dans le stockage', async () => {
 
   const alice = await store.upsertUser({ provider: 'github', providerId: '42', name: 'Alice' }, now);
   assert.equal(alice.email, null);
-  // Connexion suivante : même compte, le pseudo choisi est gardé, l'email du fournisseur complète le compte.
+  assert.equal(alice.created, true);
+  // Connexion suivante : même compte, le pseudo choisi est gardé, l'email vérifié du fournisseur complète le compte.
   const again = await store.upsertUser({ provider: 'github', providerId: '42', name: 'alice-gh', email: 'alice@example.com', emailVerified: true }, now);
   assert.equal(again.id, alice.id);
+  assert.equal(again.created, false);
   assert.equal(again.name, 'Alice');
   assert.equal(again.email, 'alice@example.com');
-  assert.equal(again.emailVerified, true);
-  const bob = await store.upsertUser({ provider: 'google', providerId: '42', name: 'Bob' }, now);
+  // Une adresse non vérifiée n'est jamais enregistrée.
+  const bob = await store.upsertUser({ provider: 'google', providerId: '42', name: 'Bob', email: 'bob@example.com', emailVerified: false }, now);
   assert.notEqual(bob.id, alice.id);
+  assert.equal(bob.email, null);
 
   const session = await store.createSession(alice.id, now);
   assert.equal((await store.getSessionUser(session, now + 1000)).name, 'Alice');
 
-  await store.updateUser(alice.id, { name: 'Ali', email: 'alice@example.com', emailConsent: true });
-  assert.deepEqual(await store.getSessionUser(session, now), { id: alice.id, provider: 'github', name: 'Ali', email: 'alice@example.com', emailVerified: true, emailConsent: true });
-  await store.updateUser(alice.id, { name: 'Ali', email: 'autre@example.com', emailConsent: true });
-  assert.equal((await store.getSessionUser(session, now)).emailVerified, false); // adresse changée à la main
-  await store.updateUser(alice.id, { name: 'Ali', email: null, emailConsent: true });
-  assert.equal((await store.getSessionUser(session, now)).emailConsent, false); // pas d'envoi sans adresse
+  await store.updateUser(alice.id, { name: 'Ali', emailConsent: true });
+  assert.deepEqual(await store.getSessionUser(session, now), { id: alice.id, provider: 'github', providers: ['github'], name: 'Ali', email: 'alice@example.com', emailConsent: true });
+  await store.updateUser(bob.id, { name: 'Bob', emailConsent: true });
+  assert.equal((await store.getUser(bob.id)).emailConsent, false); // pas d'envoi sans adresse
   assert.equal(await store.getSessionUser('inconnu', now), null);
 
   assert.equal(await store.claimGrid(alice.id, 'g1', 'mauvais', now), false);
@@ -168,14 +169,17 @@ test('un joueur anonyme se connecte après la partie et retrouve la grille dans 
   assert.equal((await request(`/api/compte/grilles/${roomId}`, { method: 'DELETE', cookie })).status, 204);
   assert.deepEqual(await (await request('/api/compte/grilles', { cookie })).json(), []);
 
-  // Pseudo, email et accord d'envoi modifiables depuis l'espace du joueur.
+  // Pseudo et accord d'envoi modifiables depuis l'espace du joueur ; l'adresse email, non.
   const patch = (body) => request('/api/compte', { method: 'PATCH', cookie, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
   assert.equal((await patch({ name: '  ' })).status, 400);
-  assert.equal((await patch({ name: 'Alice', email: 'pas-un-email' })).status, 400);
-  assert.equal((await patch({ name: 'Alice', emailConsent: true })).status, 400);
-  assert.equal((await patch({ name: 'Alice la chanceuse', email: 'alice@example.com', emailConsent: true })).status, 200);
+  assert.equal((await patch({ name: 'Alice', emailConsent: true })).status, 400); // pas d'adresse
+  assert.equal((await patch({ name: 'Alice', email: 'pirate@example.com' })).status, 200);
+  assert.equal((await (await request('/api/compte', { cookie })).json()).user.email, null); // adresse ignorée
+  // Le compte reçoit l'adresse fournie par un service de connexion.
+  await request('/auth/dev?nom=Alice&email=alice@example.com', { cookie });
+  assert.equal((await patch({ name: 'Alice la chanceuse', emailConsent: true })).status, 200);
   const updated = (await (await request('/api/compte', { cookie })).json()).user;
-  assert.deepEqual(updated, { name: 'Alice la chanceuse', provider: 'dev', email: 'alice@example.com', emailVerified: false, emailConsent: true });
+  assert.deepEqual(updated, { name: 'Alice la chanceuse', provider: 'dev', providers: ['dev'], email: 'alice@example.com', emailConsent: true });
 
   assert.equal((await request('/auth/deconnexion', { method: 'POST', cookie })).status, 204);
   assert.equal((await (await request('/api/compte', { cookie })).json()).user, null);
@@ -227,7 +231,7 @@ test('connexion GitHub : redirection, contrôle de l’état et création du com
   const cookie = sessionCookie(callback);
   const account = await (await request('/api/compte', { cookie })).json();
   // Le pseudo GitHub est repris, jamais le vrai nom ; l'email principal vérifié est gardé.
-  assert.deepEqual(account.user, { name: 'octocat', provider: 'github', email: 'octo@example.com', emailVerified: true, emailConsent: false });
+  assert.deepEqual(account.user, { name: 'octocat', provider: 'github', providers: ['github'], email: 'octo@example.com', emailConsent: false });
 
   assert.equal((await request('/auth/google')).status, 404); // fournisseur non configuré
 });
@@ -272,5 +276,5 @@ test('connexion Facebook : seul l’email est demandé, le pseudo vient des part
   assert.equal(callback.headers.get('location'), '/mon-espace');
   assert.equal(new URL(profileUrl).searchParams.get('fields'), 'id,email');
   const account = await (await request('/api/compte', { cookie: sessionCookie(callback) })).json();
-  assert.deepEqual(account.user, { name: 'Lulu', provider: 'facebook', email: 'lulu@example.com', emailVerified: true, emailConsent: false });
+  assert.deepEqual(account.user, { name: 'Lulu', provider: 'facebook', providers: ['facebook'], email: 'lulu@example.com', emailConsent: false });
 });

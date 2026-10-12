@@ -20,9 +20,10 @@ function toUser(row) {
   return {
     id: row.id,
     provider: row.provider,
+    // Tous les fournisseurs liés au compte (même adresse email), dans l'ordre de leur première connexion.
+    providers: row.providers ? String(row.providers).split(',') : [row.provider],
     name: row.name,
     email: row.email,
-    emailVerified: Boolean(row.email_verified),
     emailConsent: Boolean(row.email_consent),
     // Seulement pour un administrateur : 'superadmin' ou 'admin'.
     ...(row.role && { role: row.role }),
@@ -43,6 +44,43 @@ function toGrid(row) {
   };
 }
 
+// Mise à niveau des comptes : une adresse email identifie un seul compte, vérifiée par le fournisseur.
+// Les adresses non vérifiées (saisies à la main, ou Microsoft) sont retirées ; les comptes qui ont
+// la même adresse sont fusionnés dans le plus ancien (fournisseurs, grilles, sessions, rôle).
+async function mergeAccountsByEmail(db) {
+  await db.batch(
+    [
+      'UPDATE users SET email = NULL, email_consent = 0 WHERE email IS NOT NULL AND email_verified = 0',
+      'INSERT OR IGNORE INTO user_logins (provider, provider_id, user_id, created_at) SELECT provider, provider_id, id, created_at FROM users',
+    ],
+    'write',
+  );
+  const { rows } = await db.execute(
+    `SELECT id, lower(email) AS address, is_admin, email_consent FROM users
+    WHERE lower(email) IN (SELECT lower(email) FROM users WHERE email IS NOT NULL GROUP BY lower(email) HAVING COUNT(*) > 1)
+    ORDER BY lower(email), created_at, id`,
+  );
+  const keepers = new Map();
+  for (const row of rows) {
+    const keep = keepers.get(row.address);
+    if (!keep) {
+      keepers.set(row.address, row.id);
+      continue;
+    }
+    await db.batch(
+      [
+        { sql: 'UPDATE user_logins SET user_id = ? WHERE user_id = ?', args: [keep, row.id] },
+        { sql: 'UPDATE OR IGNORE grid_players SET user_id = ? WHERE user_id = ?', args: [keep, row.id] },
+        { sql: 'UPDATE sessions SET user_id = ? WHERE user_id = ?', args: [keep, row.id] },
+        { sql: 'UPDATE users SET is_admin = MAX(is_admin, ?), email_consent = MAX(email_consent, ?) WHERE id = ?', args: [row.is_admin, row.email_consent, keep] },
+        { sql: 'DELETE FROM users WHERE id = ?', args: [row.id] },
+      ],
+      'write',
+    );
+  }
+  await db.execute('CREATE UNIQUE INDEX IF NOT EXISTS users_email ON users (lower(email))');
+}
+
 function gridStatsInsert({ gameType = 'loto', numbers, bonus, players, rounds, drawDate = null }, createdAt) {
   return {
     sql: `INSERT INTO grid_stats (created_at, day, game_type, draw_date, numbers, bonus, players, rounds)
@@ -57,8 +95,7 @@ export function databaseFrom(env = process.env) {
   return { file: env.DATABASE_FILE ?? 'data/co-loto.db' };
 }
 
-// `superadminEmail` : adresse du superadmin. Son compte est le plus ancien qui a cette adresse,
-// vérifiée par le fournisseur de connexion (un seul compte, même s'il n'existe pas encore).
+// `superadminEmail` : adresse du superadmin, que son compte existe déjà ou non.
 export async function openStore({ url, authToken, file = ':memory:', superadminEmail = null } = {}) {
   if (!url && file !== ':memory:') mkdirSync(dirname(file), { recursive: true });
   const db = createClient(url ? { url, authToken } : { url: file === ':memory:' ? ':memory:' : `file:${file}` });
@@ -83,7 +120,9 @@ export async function openStore({ url, authToken, file = ':memory:', superadminE
   if (!columns.has('game_type')) await run("ALTER TABLE grids ADD COLUMN game_type TEXT NOT NULL DEFAULT 'loto'");
   if (!columns.has('bonus')) await run('ALTER TABLE grids ADD COLUMN bonus TEXT');
   const gridStatsExisted = Boolean(await first("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'grid_stats'"));
-  // Comptes : identifiant chez le fournisseur, pseudo et email (jamais le vrai nom).
+  // Comptes : pseudo et email (jamais le vrai nom). L'adresse email identifie le compte : elle vient
+  // toujours d'un fournisseur qui l'a vérifiée, et un seul compte peut l'avoir.
+  // `user_logins` : les fournisseurs liés à chaque compte (`users.provider` garde le premier).
   // `email_consent` : accord explicite pour recevoir les résultats par email.
   await db.batch(
     [
@@ -98,6 +137,14 @@ export async function openStore({ url, authToken, file = ':memory:', superadminE
         created_at INTEGER NOT NULL,
         UNIQUE (provider, provider_id)
       )`,
+      `CREATE TABLE IF NOT EXISTS user_logins (
+        provider TEXT NOT NULL,
+        provider_id TEXT NOT NULL,
+        user_id TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        PRIMARY KEY (provider, provider_id)
+      )`,
+      'CREATE INDEX IF NOT EXISTS user_logins_user ON user_logins (user_id)',
       `CREATE TABLE IF NOT EXISTS sessions (
         token_hash TEXT PRIMARY KEY,
         user_id TEXT NOT NULL,
@@ -148,6 +195,7 @@ export async function openStore({ url, authToken, file = ':memory:', superadminE
   const userColumns = new Set((await run('PRAGMA table_info(users)')).rows.map((c) => c.name));
   if (!userColumns.has('is_admin')) await run('ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0');
   if (!userColumns.has('last_login_at')) await run('ALTER TABLE users ADD COLUMN last_login_at INTEGER');
+  await mergeAccountsByEmail(db);
   // Première mise en place des statistiques : les grilles encore conservées y sont reprises.
   if (!gridStatsExisted) {
     const { rows } = await run('SELECT * FROM grids');
@@ -157,13 +205,17 @@ export async function openStore({ url, authToken, file = ':memory:', superadminE
   // Le rôle est calculé à chaque lecture : le superadmin suit la variable d'environnement.
   // Le premier paramètre de chaque requête qui lit USER_COLUMNS est donc l'adresse du superadmin.
   const superadmin = typeof superadminEmail === 'string' && superadminEmail.trim() ? superadminEmail.trim() : null;
-  const USER_COLUMNS = `users.id, users.provider, users.name, users.email, users.email_verified, users.email_consent,
+  const USER_COLUMNS = `users.id, users.provider, users.name, users.email, users.email_consent,
+    (SELECT group_concat(provider) FROM (SELECT provider FROM user_logins WHERE user_id = users.id ORDER BY created_at, provider)) AS providers,
     CASE
-      WHEN users.id = (SELECT s.id FROM users s WHERE s.email_verified = 1 AND lower(s.email) = lower(?) ORDER BY s.created_at, s.id LIMIT 1) THEN 'superadmin'
+      WHEN users.email IS NOT NULL AND lower(users.email) = lower(?) THEN 'superadmin'
       WHEN users.is_admin = 1 THEN 'admin'
     END AS role`;
-  const selectUser = (provider, providerId) =>
-    first(`SELECT ${USER_COLUMNS} FROM users WHERE provider = ? AND provider_id = ?`, superadmin, provider, providerId);
+  const selectUser = async (id) => {
+    const row = await first(`SELECT ${USER_COLUMNS} FROM users WHERE id = ?`, superadmin, id);
+    return row ? toUser(row) : null;
+  };
+  const userIdByEmail = async (email) => (await first('SELECT id FROM users WHERE lower(email) = lower(?)', email))?.id;
 
   const bump = (day, metric, key = '') => ({
     sql: `INSERT INTO stats_counters (day, metric, key, count) VALUES (?, ?, ?, 1)
@@ -217,32 +269,40 @@ export async function openStore({ url, authToken, file = ':memory:', superadminE
       const row = await first('SELECT * FROM grids WHERE id = ? AND expires_at > ?', id, now);
       return row ? toGrid(row) : null;
     },
-    // Retrouve le compte lié à un fournisseur, ou le crée avec ce pseudo et cet email.
-    // Ensuite, pseudo et email ne changent que depuis l'espace du joueur (l'email du
-    // fournisseur ne sert qu'à compléter un compte qui n'en a pas).
-    // `created` indique un nouveau compte.
-    async upsertUser({ provider, providerId, name, email = null, emailVerified = false }, now = Date.now()) {
-      const existing = await selectUser(provider, providerId);
-      if (existing) {
-        if (email) await run('UPDATE users SET email = ?, email_verified = ? WHERE id = ? AND email IS NULL', email, emailVerified ? 1 : 0, existing.id);
-        await run('UPDATE users SET last_login_at = ? WHERE id = ?', now, existing.id);
-      } else {
-        await run(
-          'INSERT INTO users (id, provider, provider_id, name, email, email_verified, created_at, last_login_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-          randomUUID(), provider, providerId, name, email, email && emailVerified ? 1 : 0, now, now,
-        );
+    // Connexion avec un fournisseur : retrouve le compte déjà lié à ce fournisseur, sinon le compte
+    // qui a la même adresse email (le fournisseur y est alors lié), sinon le compte `linkTo`
+    // (joueur déjà connecté qui ajoute un fournisseur), sinon crée un compte avec ce pseudo.
+    // Seule une adresse vérifiée par le fournisseur est prise en compte. `created` : nouveau compte.
+    async upsertUser({ provider, providerId, name, email = null, emailVerified = false, linkTo = null }, now = Date.now()) {
+      const address = email && emailVerified ? email : null;
+      let userId = (await first('SELECT user_id FROM user_logins WHERE provider = ? AND provider_id = ?', provider, providerId))?.user_id;
+      let created = false;
+      if (!userId) {
+        userId = (address && (await userIdByEmail(address))) || (linkTo && (await selectUser(linkTo))?.id);
+        if (!userId) {
+          userId = randomUUID();
+          created = true;
+          await run(
+            'INSERT INTO users (id, provider, provider_id, name, email, email_verified, created_at) VALUES (?, ?, ?, ?, ?, 1, ?)',
+            userId, provider, providerId, name, address, now,
+          );
+        }
+        await run('INSERT OR IGNORE INTO user_logins (provider, provider_id, user_id, created_at) VALUES (?, ?, ?, ?)', provider, providerId, userId, now);
       }
-      await db.batch([bump(dayOf(now), existing ? 'login' : 'signup', provider)], 'write');
-      return { ...toUser(await selectUser(provider, providerId)), created: !existing };
-    },
-    // Une adresse modifiée à la main n'est plus considérée comme vérifiée.
-    async updateUser(id, { name, email, emailConsent }) {
-      await run(
-        `UPDATE users SET name = ?, email = ?, email_consent = ?,
-          email_verified = CASE WHEN email IS ? THEN email_verified ELSE 0 END
-        WHERE id = ?`,
-        name, email, email && emailConsent ? 1 : 0, email, id,
+      // Un compte sans adresse prend celle du fournisseur, si aucun autre compte ne l'a.
+      if (address && !(await userIdByEmail(address))) {
+        await run('UPDATE users SET email = ?, email_verified = 1 WHERE id = ? AND email IS NULL', address, userId);
+      }
+      await db.batch(
+        [{ sql: 'UPDATE users SET last_login_at = ? WHERE id = ?', args: [now, userId] }, bump(dayOf(now), created ? 'signup' : 'login', provider)],
+        'write',
       );
+      return { ...(await selectUser(userId)), created };
+    },
+    // Pseudo et accord d'envoi des résultats (qui demande une adresse email). L'adresse, elle,
+    // vient toujours du fournisseur de connexion.
+    async updateUser(id, { name, emailConsent }) {
+      await run('UPDATE users SET name = ?, email_consent = CASE WHEN email IS NULL THEN 0 ELSE ? END WHERE id = ?', name, emailConsent ? 1 : 0, id);
     },
     async createSession(userId, now = Date.now()) {
       const token = randomBytes(32).toString('base64url');
@@ -288,6 +348,7 @@ export async function openStore({ url, authToken, file = ':memory:', superadminE
         [
           { sql: 'UPDATE grid_players SET user_id = NULL WHERE user_id = ?', args: [userId] },
           { sql: 'DELETE FROM sessions WHERE user_id = ?', args: [userId] },
+          { sql: 'DELETE FROM user_logins WHERE user_id = ?', args: [userId] },
           { sql: 'DELETE FROM users WHERE id = ?', args: [userId] },
         ],
         'write',
@@ -388,10 +449,7 @@ export async function openStore({ url, authToken, file = ':memory:', superadminE
     // --- Administration ---
 
     superadminEmail: superadmin,
-    async getUser(id) {
-      const row = await first(`SELECT ${USER_COLUMNS} FROM users WHERE id = ?`, superadmin, id);
-      return row ? toUser(row) : null;
-    },
+    getUser: selectUser,
     async listUsers(now = Date.now()) {
       const { rows } = await run(
         `SELECT ${USER_COLUMNS}, users.created_at, users.last_login_at,
