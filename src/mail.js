@@ -21,7 +21,9 @@ export function createMailer(env = process.env) {
   if (!env.RENDER) {
     return {
       async send({ to, subject, text }) {
-        console.log(`[email non envoyé, SMTP non configuré] À : ${to} · ${subject}\n${text}`);
+        // L'adresse vient d'un fournisseur de connexion : nettoyée avant d'être écrite dans le journal.
+        const oneLine = (value) => String(value).replaceAll(/[\r\n]/g, ' ');
+        console.log(`[email non envoyé, SMTP non configuré] À : ${oneLine(to)} · ${oneLine(subject)}\n${text}`);
       },
     };
   }
