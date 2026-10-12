@@ -20,9 +20,10 @@ export function createMailer(env = process.env) {
   }
   if (!env.RENDER) {
     return {
-      // L'adresse du destinataire (reçue d'un fournisseur de connexion) n'est pas écrite dans le journal.
+      // L'adresse du destinataire n'est pas écrite dans le journal, et le message y est échappé
+      // (JSON) : une valeur reçue d'une requête ne peut pas y ajouter de fausses lignes.
       async send({ subject, text }) {
-        console.log(`[email non envoyé, SMTP non configuré] ${subject}\n${text}`);
+        console.log('[email non envoyé, SMTP non configuré]', JSON.stringify({ subject, text }));
       },
     };
   }
