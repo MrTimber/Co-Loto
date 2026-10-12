@@ -208,6 +208,7 @@ test('connexion GitHub : redirection, contrôle de l’état et création du com
   assert.equal(sessionCookie(forged), undefined);
 
   let tokenRequest;
+  let githubUser = { id: 1234, login: 'octocat', email: 'octo@example.com' };
   const realFetch = globalThis.fetch;
   t.after(() => { globalThis.fetch = realFetch; });
   globalThis.fetch = async (input, init) => {
@@ -216,9 +217,9 @@ test('connexion GitHub : redirection, contrôle de l’état et création du com
       tokenRequest = new URLSearchParams(String(init.body));
       return Response.json({ access_token: 'jeton', token_type: 'bearer' });
     }
-    if (url === 'https://api.github.com/user') return Response.json({ id: 1234, login: 'octocat', name: 'Vrai Nom' });
+    if (url === 'https://api.github.com/user') return Response.json({ id: githubUser.id, login: githubUser.login, name: 'Vrai Nom' });
     if (url === 'https://api.github.com/user/emails') {
-      return Response.json([{ email: 'secondaire@example.com', primary: false, verified: true }, { email: 'octo@example.com', primary: true, verified: true }]);
+      return Response.json([{ email: 'secondaire@example.com', primary: false, verified: true }, { email: githubUser.email, primary: true, verified: true }]);
     }
     return realFetch(input, init);
   };
@@ -233,6 +234,13 @@ test('connexion GitHub : redirection, contrôle de l’état et création du com
   const account = await (await request('/api/compte', { cookie })).json();
   // Le pseudo GitHub est repris, jamais le vrai nom ; l'email principal vérifié est gardé.
   assert.deepEqual(account.user, { name: 'octocat', provider: 'github', providers: ['github'], email: 'octo@example.com', emailVerified: true, emailConsent: false });
+
+  // Un pseudo déjà choisi dans les parties passe avant celui de GitHub.
+  githubUser = { id: 5678, login: 'momo-gh', email: 'momo@example.com' };
+  const start2 = await request('/auth/github?retour=/mon-espace&pseudo=Momo');
+  const state2 = new URL(start2.headers.get('location')).searchParams.get('state');
+  const callback2 = await request(`/auth/github/callback?code=abc&state=${state2}`, { cookie: start2.headers.getSetCookie()[0].split(';')[0] });
+  assert.equal((await (await request('/api/compte', { cookie: sessionCookie(callback2) })).json()).user.name, 'Momo');
 
   assert.equal((await request('/auth/google')).status, 404); // fournisseur non configuré
 });

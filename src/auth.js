@@ -5,7 +5,7 @@
 import express from 'express';
 import * as oidc from 'openid-client';
 import { loginCodeEmail, verificationEmail } from './mail.js';
-import { LOGIN_CODE_LIFETIME_MS } from './store.js';
+import { DEFAULT_NAME, LOGIN_CODE_LIFETIME_MS } from './store.js';
 
 const SESSION_COOKIE = 'coloto_session';
 const OAUTH_COOKIE = 'coloto_oauth';
@@ -215,7 +215,7 @@ export function createAuth({ store, env = process.env, mailer = null, findRoomId
   // avec un autre fournisseur lui lie ce fournisseur. Si un compte a déjà l'adresse non vérifiée
   // que donne le fournisseur, un code est d'abord envoyé à cette adresse.
   async function logIn(req, res, { provider, providerId, pseudo, email = null, emailVerified = false, retour }) {
-    const name = cleanName(pseudo) || 'Joueur';
+    const name = cleanName(pseudo) || DEFAULT_NAME;
     const linkTo = (await currentUser(req))?.id;
     const user = await store.upsertUser({ provider, providerId, name, email, emailVerified, linkTo });
     if (!user.needsCode) {
@@ -298,7 +298,8 @@ export function createAuth({ store, env = process.env, mailer = null, findRoomId
         await logIn(req, res, {
           provider: providerId,
           providerId: profile.id,
-          pseudo: cleanName(profile.pseudo) || cleanName(pending.pseudo),
+          // Le pseudo des parties passe avant celui du service (GitHub, Discord).
+          pseudo: cleanName(pending.pseudo) || cleanName(profile.pseudo),
           email,
           emailVerified: Boolean(email) && profile.emailVerified,
           retour,

@@ -8,6 +8,8 @@ import { todayInFrance } from './games.js';
 export const GRID_LIFETIME_MS = 30 * 24 * 60 * 60 * 1000;
 export const SESSION_LIFETIME_MS = 30 * 24 * 60 * 60 * 1000;
 // Statistiques anonymes (numéros joués, fréquentation) : gardées 3 ans.
+// Pseudo d'un compte quand ni les parties ni le service de connexion n'en donnent un.
+export const DEFAULT_NAME = 'Joueur';
 export const STATS_LIFETIME_MS = 3 * 365 * 24 * 60 * 60 * 1000;
 // Code de connexion envoyé par email, et lien de vérification d'une adresse.
 export const LOGIN_CODE_LIFETIME_MS = 15 * 60 * 1000;
@@ -363,7 +365,12 @@ export async function openStore({ url, authToken, file = ':memory:', superadminE
         }
       }
       await db.batch(
-        [{ sql: 'UPDATE users SET last_login_at = ? WHERE id = ?', args: [now, userId] }, bump(dayOf(now), created ? 'signup' : 'login', provider)],
+        [
+          { sql: 'UPDATE users SET last_login_at = ? WHERE id = ?', args: [now, userId] },
+          // Un compte resté au pseudo par défaut prend celui de cette connexion.
+          { sql: 'UPDATE users SET name = ? WHERE id = ? AND name = ? AND ? <> ?', args: [name, userId, DEFAULT_NAME, name, DEFAULT_NAME] },
+          bump(dayOf(now), created ? 'signup' : 'login', provider),
+        ],
         'write',
       );
       return { ...(await selectUser(userId)), created };

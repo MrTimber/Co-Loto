@@ -61,6 +61,13 @@ test('une adresse email = un seul compte ; rôles réservés aux adresses vérif
   assert.equal(linked.email, 'lulu@example.com');
   assert.equal(linked.emailVerified, false);
 
+  // Un compte resté au pseudo par défaut prend celui de la connexion suivante, pas un compte qui a un pseudo.
+  const anon = await store.upsertUser({ provider: 'google', providerId: 'anon', name: 'Joueur' }, now);
+  assert.equal((await store.upsertUser({ provider: 'google', providerId: 'anon', name: 'Joueur' }, now)).name, 'Joueur');
+  assert.equal((await store.upsertUser({ provider: 'google', providerId: 'anon', name: 'Zoé' }, now)).name, 'Zoé');
+  assert.equal((await store.upsertUser({ provider: 'google', providerId: 'anon', name: 'Autre' }, now)).name, 'Zoé');
+  await store.deleteUser(anon.id);
+
   // Rôle admin : seulement avec une adresse vérifiée.
   assert.equal(await store.setAdmin(lulu.id, true), false);
   const verification = await store.createVerification(lulu.id, now);
