@@ -36,34 +36,56 @@ function gridItem(grid) {
 const providerNames = (ids) => ids.map((id) => PROVIDER_NAMES[id] ?? id).join(', ');
 
 // L'adresse email vient du service de connexion : affichée, jamais modifiable.
-function emailInfo(user, providers) {
+// Une adresse non vérifiée peut l'être grâce à un lien envoyé par email.
+function emailInfo(user, providers, canVerify) {
   if (user.email) {
-    return el('div', 'field', el('p', 'field-label', 'Adresse email'), el('p', 'field-value', user.email), el('p', 'small muted', 'Fournie par le service de connexion, elle identifie votre compte.'));
+    const badge = user.emailVerified ? el('span', 'tag ok', 'Vérifiée') : el('span', 'tag warn', 'Non vérifiée');
+    const box = el('div', 'field', el('p', 'field-label', 'Adresse email'), el('p', 'field-value', user.email, ' ', badge));
+    if (user.emailVerified) {
+      box.append(el('p', 'small muted', 'Fournie par le service de connexion, elle identifie votre compte.'));
+    } else {
+      box.append(el('p', 'small muted', 'Le service de connexion ne l’a pas vérifiée. Vérifiez-la pour recevoir les résultats par email.'));
+      if (canVerify) {
+        const verify = el('button', 'small', 'Vérifier mon adresse');
+        verify.type = 'button';
+        const status = el('output', 'small');
+        verify.addEventListener('click', async () => {
+          verify.disabled = true;
+          const res = await fetch('/api/compte/verification', { method: 'POST' }).catch(() => null);
+          const body = await res?.json().catch(() => ({}));
+          status.className = res?.ok ? 'small' : 'small error';
+          status.textContent = res?.ok ? `Un email vient d’être envoyé à ${user.email} : ouvrez le lien qu’il contient.` : (body?.error ?? 'Envoi impossible, réessayez.');
+          if (!res?.ok) verify.disabled = false;
+        });
+        box.append(el('div', 'actions', verify, status));
+      }
+    }
+    return box;
   }
   const others = providers.filter((p) => !user.providers.includes(p.id));
   return el(
     'div',
     'field',
     el('p', 'field-label', 'Adresse email'),
-    el('p', 'small muted', 'Votre compte n’a pas d’adresse email : le service utilisé ne l’a pas fournie ou ne l’a pas vérifiée. Connectez-vous ici avec un autre service pour l’ajouter.'),
+    el('p', 'small muted', 'Votre compte n’a pas d’adresse email : le service utilisé ne l’a pas fournie. Connectez-vous ici avec un autre service pour l’ajouter.'),
     others.length ? providerButtons(others, '/mon-espace') : '',
   );
 }
 
-function profileForm(user, providers) {
+function profileForm(user, providers, canVerify) {
   const form = el('form', 'profile');
   const field = (label, input) => el('label', '', label, input);
   const name = el('input');
   Object.assign(name, { name: 'name', required: true, maxLength: 24, autocomplete: 'nickname', value: user.name });
   const consent = el('input');
-  Object.assign(consent, { name: 'emailConsent', type: 'checkbox', checked: user.emailConsent, disabled: !user.email });
+  Object.assign(consent, { name: 'emailConsent', type: 'checkbox', checked: user.emailConsent, disabled: !user.emailVerified });
   const status = el('output', 'small');
   const save = el('button', 'primary', 'Enregistrer');
   save.type = 'submit';
   form.append(
     el('h2', '', 'Mon compte'),
     field('Pseudo', name),
-    emailInfo(user, providers),
+    emailInfo(user, providers, canVerify),
     el('label', 'inline', consent, ' M\u2019envoyer par email le résultat de mes grilles qui ont une date de tirage'),
     el('p', 'small muted', 'L\u2019envoi des résultats arrivera dans une prochaine version. Vous pouvez retirer cet accord à tout moment.'),
     el('div', 'actions', save, status),
@@ -111,18 +133,23 @@ function accountActions(user) {
   ];
 }
 
-const { user, providers } = await getAccount();
+const { user, providers, emailVerification } = await getAccount();
+const verification = new URLSearchParams(location.search).get('verification');
+if (verification) history.replaceState(null, '', location.pathname);
 if (user) {
   await claimStoredGrids();
   const res = await fetch('/api/compte/grilles');
   const grids = res.ok ? await res.json() : [];
-  card.replaceChildren(el('h1', '', 'Mon espace'), el('h2', '', 'Mes grilles'));
+  card.replaceChildren(el('h1', '', 'Mon espace'));
+  if (verification === 'ok') card.append(el('p', 'banner', '✓ Votre adresse email est vérifiée.'));
+  if (verification === 'echec') card.append(el('p', 'banner warn', 'Ce lien de vérification n’est plus valable. Demandez-en un nouveau ci-dessous.'));
+  card.append(el('h2', '', 'Mes grilles'));
   if (grids.length) {
     card.append(el('ul', 'my-grids', ...grids.map(gridItem)));
   } else {
     card.append(el('p', 'muted', 'Aucune grille pour l’instant. Les grilles que vous co-créez en étant connecté apparaissent ici pendant 30 jours.'));
   }
-  card.append(profileForm(user, providers), ...accountActions(user));
+  card.append(profileForm(user, providers, emailVerification), ...accountActions(user));
 } else {
   card.replaceChildren(
     el('h1', '', 'Mon espace'),

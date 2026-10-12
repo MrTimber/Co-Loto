@@ -162,6 +162,8 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .players.compact li { border: 0; padding: 0; }
 .tag { font-size: .75rem; padding: .05rem .45rem; border-radius: 99px; background: var(--picked); color: var(--muted); }
 .tag.warn { background: var(--pending-soft); color: var(--text); }
+.tag.ok { background: var(--accent-soft); color: var(--text); }
+.banner.warn { background: var(--pending-soft); }
 .pick-status { font-size: .85rem; color: var(--muted); }
 .pick-status.done { color: var(--accent); font-weight: 600; }
 

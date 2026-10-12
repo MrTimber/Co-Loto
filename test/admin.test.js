@@ -10,36 +10,61 @@ import { pagePath, deviceOf, referrerHost, isBot } from '../src/stats.js';
 
 const grid = (id, numbers, bonus, extra = {}) => ({ id, numbers, bonus, players: ['Alice', 'Bob'], rounds: 7, participants: [{ token: `t-${id}`, name: 'Alice' }], ...extra });
 
-test('une adresse email = un seul compte, quel que soit le fournisseur ; le superadmin est ce compte', async () => {
+test('une adresse email = un seul compte ; rôles réservés aux adresses vérifiées', async () => {
   const store = await openStore({ superadminEmail: 'Boss@Example.com' });
   const now = Date.UTC(2026, 9, 9);
-  // Adresse non vérifiée (compte Microsoft professionnel…) : ignorée, donc jamais superadmin.
+  // Adresse non vérifiée (compte Microsoft professionnel…) : gardée comme telle, jamais superadmin.
   const fake = await store.upsertUser({ provider: 'microsoft', providerId: 'm', name: 'Faux', email: 'boss@example.com', emailVerified: false }, now);
-  assert.equal(fake.email, null);
+  assert.equal(fake.email, 'boss@example.com');
+  assert.equal(fake.emailVerified, false);
   assert.equal(fake.role, undefined);
+  // Même adresse, non vérifiée, avec un autre fournisseur : il faut un code envoyé par email.
+  assert.deepEqual(await store.upsertUser({ provider: 'discord', providerId: 'x', name: 'Autre', email: 'BOSS@example.com', emailVerified: false }, now), {
+    needsCode: true,
+    email: 'BOSS@example.com',
+  });
+  // Adresse vérifiée : rien ne prouve que le compte non vérifié est à la même personne, il perd l'adresse.
   const boss = await store.upsertUser({ provider: 'google', providerId: 'g', name: 'Boss', email: 'boss@example.com', emailVerified: true }, now + 1);
+  assert.notEqual(boss.id, fake.id);
   assert.equal(boss.role, 'superadmin');
   assert.equal(boss.created, true);
-  // Même adresse avec un autre fournisseur : même compte, le fournisseur y est lié.
+  assert.equal((await store.getUser(fake.id)).email, null);
+  // Même adresse vérifiée avec un autre fournisseur : même compte, le fournisseur y est lié.
   const again = await store.upsertUser({ provider: 'github', providerId: 'h', name: 'Boss bis', email: 'BOSS@example.com', emailVerified: true }, now + 2);
   assert.equal(again.id, boss.id);
   assert.equal(again.created, false);
   assert.equal(again.name, 'Boss');
   assert.deepEqual(again.providers, ['google', 'github']);
   assert.equal((await store.upsertUser({ provider: 'github', providerId: 'h', name: 'x' }, now + 3)).id, boss.id);
+  // Après un code bon, la connexion reprend avec une adresse vérifiée : le fournisseur est lié.
+  const { token, code } = await store.createLoginCode({ provider: 'discord', providerId: 'x', name: 'Autre', email: 'boss@example.com', retour: '/' }, now);
+  assert.deepEqual(await store.getLoginCode(token, now), { email: 'boss@example.com' });
+  assert.deepEqual(await store.checkLoginCode(token, '000000' === code ? '111111' : '000000', now), { error: 'invalid' });
+  const { pending } = await store.checkLoginCode(token, code, now);
+  assert.equal(pending.providerId, 'x');
+  assert.deepEqual(await store.checkLoginCode(token, code, now), { error: 'expired' }); // une seule fois
+  assert.equal((await store.upsertUser({ ...pending, emailVerified: true }, now)).id, boss.id);
 
   // Un joueur connecté sans adresse qui se connecte avec un autre service : le service est lié, l'adresse ajoutée.
   const lulu = await store.upsertUser({ provider: 'discord', providerId: 'd', name: 'Lulu' }, now);
-  const linked = await store.upsertUser({ provider: 'facebook', providerId: 'f', name: 'x', email: 'lulu@example.com', emailVerified: true, linkTo: lulu.id }, now + 4);
+  const linked = await store.upsertUser({ provider: 'facebook', providerId: 'f', name: 'x', email: 'lulu@example.com', emailVerified: false, linkTo: lulu.id }, now + 4);
   assert.equal(linked.id, lulu.id);
   assert.equal(linked.email, 'lulu@example.com');
+  assert.equal(linked.emailVerified, false);
 
-  assert.equal(await store.setAdmin(fake.id, true), true);
-  assert.equal((await store.getUser(fake.id)).role, 'admin');
+  // Rôle admin : seulement avec une adresse vérifiée.
+  assert.equal(await store.setAdmin(lulu.id, true), false);
+  const verification = await store.createVerification(lulu.id, now);
+  assert.deepEqual(await store.createVerification(lulu.id, now + 1000), { tooSoon: true });
+  assert.equal(await store.verifyEmail('faux', now), false);
+  assert.equal(await store.verifyEmail(verification.token, now + 1000), true);
+  assert.equal((await store.getUser(lulu.id)).emailVerified, true);
+  assert.equal(await store.createVerification(lulu.id, now), null); // déjà vérifiée
+  assert.equal(await store.setAdmin(lulu.id, true), true);
+  assert.equal((await store.getUser(lulu.id)).role, 'admin');
   const users = await store.listUsers(now);
-  assert.equal(users.length, 3);
   assert.deepEqual(users.map((u) => u.role ?? null).sort(), ['admin', 'superadmin', null].sort());
-  assert.equal(users.find((u) => u.id === boss.id).lastLoginAt, new Date(now + 3).toISOString());
+  assert.equal(users.find((u) => u.id === boss.id).lastLoginAt, new Date(now).toISOString());
 
   // Sans variable : aucun superadmin.
   const plain = await openStore();
@@ -48,7 +73,7 @@ test('une adresse email = un seul compte, quel que soit le fournisseur ; le supe
   plain.close();
 });
 
-test('mise à niveau : adresses non vérifiées retirées, comptes de même adresse fusionnés', async () => {
+test('mise à niveau : un seul compte par adresse', async () => {
   const file = join(mkdtempSync(join(tmpdir(), 'coloto-')), 'comptes.db');
   const old = new DatabaseSync(file);
   old.exec(`CREATE TABLE users (id TEXT PRIMARY KEY, provider TEXT NOT NULL, provider_id TEXT NOT NULL, name TEXT NOT NULL, email TEXT,
@@ -56,25 +81,28 @@ test('mise à niveau : adresses non vérifiées retirées, comptes de même adre
     CREATE TABLE sessions (token_hash TEXT PRIMARY KEY, user_id TEXT NOT NULL, expires_at INTEGER NOT NULL);
     CREATE TABLE grid_players (token_hash TEXT PRIMARY KEY, grid_id TEXT NOT NULL, name TEXT NOT NULL, user_id TEXT);`);
   const insert = old.prepare('INSERT INTO users VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
+  insert.run('u0', 'discord', 'd', 'Squatteur', 'alice@example.com', 0, 0, 0);
   insert.run('u1', 'google', 'g', 'Alice', 'alice@example.com', 1, 0, 1);
   insert.run('u2', 'github', 'h', 'Alice GH', 'Alice@Example.com', 1, 1, 2);
-  insert.run('u3', 'microsoft', 'm', 'Moi', 'saisie@example.com', 0, 1, 3);
+  insert.run('u3', 'microsoft', 'm', 'Moi', 'seule@example.com', 0, 1, 3);
   old.prepare('INSERT INTO grid_players VALUES (?, ?, ?, ?)').run('t', 'g1', 'Alice', 'u2');
   old.prepare('INSERT INTO sessions VALUES (?, ?, ?)').run('s', 'u2', Date.now() + 100_000);
   old.close();
 
   const store = await openStore({ file });
   const users = await store.listUsers();
-  assert.equal(users.length, 2);
+  assert.equal(users.length, 3);
   const alice = users.find((u) => u.id === 'u1');
-  assert.deepEqual(alice.providers, ['google', 'github']);
+  assert.deepEqual(alice.providers, ['google', 'github']); // comptes vérifiés fusionnés
   assert.equal(alice.emailConsent, true);
-  assert.equal(users.find((u) => u.id === 'u3').email, null);
+  assert.equal(users.find((u) => u.id === 'u0').email, null); // non vérifié : perd l'adresse
+  assert.equal(users.find((u) => u.id === 'u3').email, 'seule@example.com'); // gardée, non vérifiée
+  assert.equal(users.find((u) => u.id === 'u3').emailVerified, false);
   assert.equal((await store.upsertUser({ provider: 'github', providerId: 'h', name: 'x' })).id, 'u1');
   store.close();
   // Une seconde ouverture ne change plus rien.
   const reopened = await openStore({ file });
-  assert.equal((await reopened.listUsers()).length, 2);
+  assert.equal((await reopened.listUsers()).length, 3);
   reopened.close();
 });
 
@@ -142,11 +170,12 @@ test('pages comptées, appareils, sites d’origine et robots', () => {
 let server;
 let baseUrl;
 let store;
+const mails = [];
 const BROWSER = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/130';
 
 before(async () => {
   store = await openStore({ superadminEmail: 'boss@example.com' });
-  server = createApp({ store, env: { AUTH_DEV_LOGIN: '1', PUBLIC_URL: 'https://co-loto.example' } }).httpServer;
+  server = createApp({ store, env: { AUTH_DEV_LOGIN: '1', PUBLIC_URL: 'https://co-loto.example' }, mailer: { send: async (m) => mails.push(m) } }).httpServer;
   await new Promise((resolve) => server.listen(0, resolve));
   baseUrl = `http://localhost:${server.address().port}`;
 });
@@ -172,7 +201,7 @@ test('un visiteur ou un joueur classique ne voit rien de l’administration', as
     }
   }
   const account = await json('/api/compte', { cookie: player });
-  assert.deepEqual(Object.keys(account.user).sort(), ['email', 'emailConsent', 'name', 'provider', 'providers']);
+  assert.deepEqual(Object.keys(account.user).sort(), ['email', 'emailConsent', 'emailVerified', 'name', 'provider', 'providers']);
   // Les scripts publics ne contiennent pas les entrées du menu d'administration.
   assert.doesNotMatch(await (await request('/js/header.js')).text(), /Tableau de bord|Utilisateurs|Fréquentation/);
 });
@@ -252,4 +281,60 @@ test('un admin consulte les grilles d’un joueur, la fréquentation et les num�
   assert.equal(overview.month.gamesFinished, 1);
   assert.equal(overview.activeGrids, 1);
   assert.equal(typeof overview.live.connections, 'number');
+});
+
+test('connexion avec une adresse non vérifiée déjà utilisée : code envoyé par email', async () => {
+  const owner = await login({ nom: 'Proprio', email: 'proprio@example.com' });
+  const ownerId = (await json('/api/compte', { cookie: owner })).user;
+  assert.ok(ownerId);
+  // Un autre service donne la même adresse sans l'avoir vérifiée.
+  const start = await request(`/auth/dev?${new URLSearchParams({ nom: 'Intrus', email: 'proprio@example.com', verifiee: '0', retour: '/mon-espace' })}`);
+  assert.equal(start.headers.get('location'), '/code-connexion');
+  assert.equal(start.headers.getSetCookie().some((c) => c.startsWith('coloto_session=')), false);
+  const codeCookie = start.headers.getSetCookie().find((c) => c.startsWith('coloto_code=')).split(';')[0];
+  const mail = mails.at(-1);
+  assert.equal(mail.to, 'proprio@example.com');
+  const code = /(\d{6})/.exec(mail.subject)[1];
+  assert.deepEqual(await json('/api/connexion/code', { cookie: codeCookie }), { email: 'p•••@example.com' });
+  const send = (value) => request('/api/connexion/code', { method: 'POST', cookie: codeCookie, headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code: value }) });
+  assert.equal((await send(code === '123456' ? '654321' : '123456')).status, 400);
+  const ok = await send(code);
+  assert.equal(ok.status, 200);
+  assert.deepEqual(await ok.json(), { retour: '/mon-espace' });
+  const cookie = ok.headers.getSetCookie().find((c) => c.startsWith('coloto_session=')).split(';')[0];
+  const account = (await json('/api/compte', { cookie })).user;
+  assert.equal(account.name, 'Proprio');
+  assert.deepEqual(account.providers, ['dev']);
+  assert.equal((await send(code)).status, 410);
+
+  // Aucun compte avec cette adresse : compte créé, adresse non vérifiée, puis vérifiée par lien.
+  const fresh = await login({ nom: 'Nouveau', email: 'nouveau@example.com', verifiee: '0' });
+  const user = (await json('/api/compte', { cookie: fresh })).user;
+  assert.equal(user.email, 'nouveau@example.com');
+  assert.equal(user.emailVerified, false);
+  const patch = (body) => request('/api/compte', { method: 'PATCH', cookie: fresh, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  assert.equal((await patch({ name: 'Nouveau', emailConsent: true })).status, 400); // adresse non vérifiée
+  assert.equal((await request('/api/compte/verification', { method: 'POST', cookie: fresh })).status, 200);
+  assert.equal((await request('/api/compte/verification', { method: 'POST', cookie: fresh })).status, 429);
+  const link = /https:\/\/co-loto\.example\/verifier-email\?jeton=(\S+)/.exec(mails.at(-1).text);
+  assert.equal(mails.at(-1).to, 'nouveau@example.com');
+  const verified = await request(`/verifier-email?jeton=${link[1]}`);
+  assert.equal(verified.headers.get('location'), '/mon-espace?verification=ok');
+  assert.equal((await json('/api/compte', { cookie: fresh })).user.emailVerified, true);
+  assert.equal((await request(`/verifier-email?jeton=${link[1]}`)).headers.get('location'), '/mon-espace?verification=echec');
+  assert.equal((await patch({ name: 'Nouveau', emailConsent: true })).status, 200);
+});
+
+test('le rôle admin n’est donné qu’à une adresse vérifiée', async () => {
+  const boss = await login({ nom: 'Boss', email: 'boss@example.com' });
+  await login({ nom: 'Douteux', email: 'douteux@example.com', verifiee: '0' });
+  const users = (await json('/api/admin/utilisateurs', { cookie: boss })).users;
+  const target = users.find((u) => u.name === 'Douteux');
+  assert.equal(target.emailVerified, false);
+  assert.equal((await putAdmin(target.id, true, boss)).status, 400);
+  // Un superadmin dont l'adresse n'est pas vérifiée n'a aucun rôle.
+  const local = await openStore({ superadminEmail: 'chef@example.com' });
+  const chef = await local.upsertUser({ provider: 'microsoft', providerId: 'c', name: 'Chef', email: 'chef@example.com', emailVerified: false });
+  assert.equal(chef.role, undefined);
+  local.close();
 });

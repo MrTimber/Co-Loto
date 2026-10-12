@@ -166,6 +166,7 @@ export function createAdmin({ store, currentUser, live = () => ({}), now = () =>
     const target = await store.getUser(req.params.id);
     if (!target) return res.status(404).json({ error: 'Ce compte n’existe plus.' });
     if (target.role === 'superadmin') return res.status(400).json({ error: 'Le superadmin reste toujours administrateur.' });
+    if (admin && !target.emailVerified) return res.status(400).json({ error: 'Le rôle admin ne peut être donné qu’à un compte dont l’adresse email est vérifiée.' });
     await store.setAdmin(target.id, admin);
     res.json(await store.getUser(target.id));
   });

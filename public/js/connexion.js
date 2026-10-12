@@ -5,7 +5,10 @@ const retour = params.get('retour') || '/mon-espace';
 const box = document.getElementById('login-providers');
 
 if (params.has('erreur')) {
-  document.getElementById('login-error').textContent = 'La connexion n’a pas abouti. Vous pouvez réessayer.';
+  document.getElementById('login-error').textContent =
+    params.get('erreur') === 'email'
+      ? 'Un compte existe déjà avec l’adresse email de ce service, mais elle n’a pas pu être confirmée par email. Connectez-vous avec le service habituel de ce compte.'
+      : 'La connexion n’a pas abouti. Vous pouvez réessayer.';
 }
 
 const { user, providers } = await getAccount();

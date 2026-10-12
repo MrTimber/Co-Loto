@@ -100,8 +100,8 @@ Le jeu est choisi à la création du salon :
 
 Réservé aux administrateurs, il est accessible depuis le menu burger, qu'un administrateur connecté voit toujours, même sur grand écran. Pour tout autre visiteur, ses pages, ses scripts et son API n'existent pas (erreur 404) et le menu reste le menu habituel.
 
-- **Superadmin** : il y en a un seul, désigné par la variable d'environnement `SUPERADMIN_EMAIL`. C'est le compte qui a cette adresse email (une adresse n'appartient qu'à un compte, voir « Un compte par adresse email »). Le compte n'a pas besoin d'exister à l'avance : il devient superadmin à sa première connexion avec un service qui fournit cette adresse. Son rôle ne peut pas lui être retiré ; seul un changement de la variable désigne un autre superadmin.
-- **Administrateurs** : le superadmin nomme ou retire les administrateurs depuis la page « Utilisateurs ».
+- **Superadmin** : il y en a un seul, désigné par la variable d'environnement `SUPERADMIN_EMAIL`. C'est le compte qui a cette adresse email (une adresse n'appartient qu'à un compte, voir « Comptes et adresses email »), **à condition qu'elle soit vérifiée**. Le compte n'a pas besoin d'exister à l'avance : il devient superadmin dès qu'il a cette adresse, vérifiée. Son rôle ne peut pas lui être retiré ; seul un changement de la variable désigne un autre superadmin.
+- **Administrateurs** : le superadmin nomme ou retire les administrateurs depuis la page « Utilisateurs ». Seul un compte dont l'adresse email est vérifiée peut être nommé, et un rôle n'est effectif qu'avec une adresse vérifiée.
 
 Pages :
 
@@ -140,6 +140,7 @@ src/app.js        Serveur HTTP, API et événements temps réel
 src/store.js      Stockage des grilles terminées (30 jours), des comptes et des sessions (Turso ou fichier SQLite)
 src/auth.js       Connexion Google, Microsoft, GitHub, Discord, Facebook (OAuth 2.0 avec openid-client) et API « Mon espace »
 src/admin.js      Espace d'administration : pages et API réservées aux administrateurs
+src/mail.js       Envoi des emails (SMTP) : codes de connexion, vérification d'adresse
 src/stats.js      Mesure d'audience (pages vues, visiteurs du jour, appareils, sites d'origine)
 src/drawDate.js   Validation de la date de tirage
 src/index.js      Point d'entrée
@@ -178,13 +179,14 @@ Variables d'environnement facultatives :
 | `FACEBOOK_CLIENT_ID`, `FACEBOOK_CLIENT_SECRET` | Connexion avec Facebook | _(désactivée)_ |
 | `PUBLIC_URL` | Adresse publique du site, pour les URL de rappel de la connexion : `https://co-loto.com` en production (indispensable avec un nom de domaine personnalisé) | `RENDER_EXTERNAL_URL` sur Render (adresse `…onrender.com`), sinon adresse de la requête |
 | `SUPERADMIN_EMAIL` | Adresse email du superadmin de l'espace d'administration (voir « Espace d'administration ») | _(aucun administrateur)_ |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`, `SMTP_SECURE` | Serveur SMTP pour envoyer les codes de connexion et les liens de vérification d'adresse (voir « Envoi des emails ») | _(emails affichés dans le journal en local, indisponibles sur Render)_ |
 | `AUTH_DEV_LOGIN` | `1` ajoute un « compte de test » sans fournisseur, pour le développement local (toujours ignoré sur Render) | _(désactivé)_ |
 
 Un fournisseur n'apparaît que si son identifiant **et** son secret sont définis. Sans aucun, le site fonctionne sans compte, comme avant.
 
 Pour essayer la connexion en local sans créer d'application OAuth : `AUTH_DEV_LOGIN=1 npm start`.
 
-Pour essayer l'espace d'administration en local : `AUTH_DEV_LOGIN=1 SUPERADMIN_EMAIL=moi@example.com npm start`, puis ouvrez `http://localhost:3000/auth/dev?nom=Moi&email=moi@example.com` (l'adresse du compte de test compte comme vérifiée).
+Pour essayer l'espace d'administration en local : `AUTH_DEV_LOGIN=1 SUPERADMIN_EMAIL=moi@example.com npm start`, puis ouvrez `http://localhost:3000/auth/dev?nom=Moi&email=moi@example.com` (l'adresse du compte de test compte comme vérifiée ; ajoutez `&verifiee=0` pour simuler une adresse non vérifiée : le code ou le lien de vérification s'affiche alors dans le journal du serveur).
 
 Pour tester à plusieurs sur une seule machine, ouvrez le lien du salon dans une fenêtre de navigation privée.
 
@@ -283,11 +285,36 @@ Les aperçus de pull request ont une autre adresse : la connexion n'y fonctionne
 
 Co-Loto demande à chaque service l'accès à l'adresse email, pour pouvoir envoyer plus tard les résultats des grilles (uniquement avec l'accord du joueur, donné dans « Mon espace »). Données conservées : le fournisseur, l'identifiant technique qu'il donne, l'adresse email et un pseudo (celui des parties, ou le pseudo GitHub ou Discord ; jamais les vrais nom et prénom). Le joueur modifie son pseudo dans « Mon espace », et peut y supprimer son compte.
 
-**Un compte par adresse email.** L'adresse email identifie le compte : elle vient toujours du service de connexion, qui l'a vérifiée, et ne se modifie pas dans « Mon espace ». Se connecter avec un autre service qui donne la même adresse ouvre le même compte (le service y est alors lié). Les adresses non vérifiées sont ignorées : celle d'un compte Microsoft professionnel (seuls les comptes Microsoft personnels, outlook.com, hotmail.com…, ont une adresse vérifiée), ou celle d'un compte GitHub ou Discord qui ne l'a pas confirmée. Un compte sans adresse peut en recevoir une en se connectant, depuis « Mon espace », avec un service qui la fournit. Au premier démarrage de cette version, les adresses non vérifiées déjà enregistrées sont retirées, et les comptes qui avaient la même adresse sont fusionnés dans le plus ancien (fournisseurs, grilles et rôle compris). Le détail est sur la page `/confidentialite` du site.
+#### Comptes et adresses email
+
+- **Un compte par adresse.** L'adresse email vient toujours du service de connexion et identifie le compte : elle ne se modifie pas dans « Mon espace », qui l'affiche avec un badge **Vérifiée** ou **Non vérifiée**.
+- **Adresse vérifiée par le service** (Google ; Microsoft pour les comptes personnels ; GitHub et Discord quand l'adresse est confirmée chez eux ; Facebook) : si un compte a déjà cette adresse vérifiée, le service y est lié et le joueur arrive sur ce compte.
+- **Adresse non vérifiée par le service** (compte Microsoft professionnel, adresse non confirmée chez GitHub ou Discord) : si un compte a déjà cette adresse, un **code à 6 chiffres** est envoyé à cette adresse et le joueur doit le saisir pour terminer la connexion (15 minutes, 5 essais). Sinon, un compte est créé avec l'adresse marquée **Non vérifiée**.
+- **Vérifier son adresse** : dans « Mon espace », le bouton « Vérifier mon adresse » envoie un lien valable 24 heures. Une adresse vérifiée est nécessaire pour être administrateur et pour recevoir les résultats par email.
+- Un compte dont l'adresse n'est pas vérifiée ne reçoit jamais un autre service par simple correspondance d'adresse : si quelqu'un prouve ensuite qu'il possède cette adresse (service qui l'a vérifiée, ou code reçu), il obtient son propre compte et l'autre compte perd l'adresse. Cela empêche de réserver l'adresse de quelqu'un d'autre pour accéder à ses grilles.
+- Un joueur connecté peut lier un autre service depuis « Mon espace » ; un compte sans adresse reçoit ainsi celle du service.
+- Au premier démarrage de cette version, les comptes qui partagent une adresse vérifiée sont fusionnés dans le plus ancien (services, grilles et rôle compris) ; les autres comptes qui avaient cette adresse sans l'avoir vérifiée la perdent.
+
+#### Envoi des emails (SMTP)
+
+Les codes de connexion et les liens de vérification sont envoyés par un serveur SMTP, celui d'un service d'envoi d'emails (par exemple [Brevo](https://www.brevo.com/fr/), dont l'offre gratuite suffit, Mailjet ou Mailgun) ou de votre messagerie. Ajoutez dans Render :
+
+| Variable | Rôle | Exemple |
+|---|---|---|
+| `SMTP_HOST` | Serveur SMTP | `smtp-relay.brevo.com` |
+| `SMTP_PORT` | Port : `587` (STARTTLS, exigé), `465` (TLS) ou `2525` | `587` |
+| `SMTP_USER` | Identifiant SMTP | fourni par le service |
+| `SMTP_PASSWORD` | Mot de passe ou clé SMTP | fourni par le service |
+| `SMTP_FROM` | Expéditeur des emails, d'une adresse ou d'un domaine validé chez le service | `Co-Loto <noreply@co-loto.com>` |
+| `SMTP_SECURE` | Facultatif : `true` pour forcer TLS dès la connexion | `true` si le port est `465` |
+
+Pour que les emails n'arrivent pas en courrier indésirable, validez le domaine `co-loto.com` chez le service d'envoi (enregistrements SPF et DKIM à ajouter chez le registraire du domaine). Si l'hébergeur bloque les ports SMTP habituels, utilisez le port `2525`, proposé par la plupart des services d'envoi.
+
+Sans `SMTP_HOST`, les emails sont affichés dans le journal du serveur en local ; sur Render, l'envoi est indisponible : le bouton « Vérifier mon adresse » n'apparaît pas, et une connexion qui demande un code est refusée avec un message.
 
 #### Espace d'administration
 
-Dans Render, ajoutez la variable `SUPERADMIN_EMAIL` avec votre adresse email (**Environment** > **Add Environment Variable**, puis **Save Changes**). Connectez-vous ensuite sur le site avec un service qui fournit cette adresse : le menu burger affiche alors les entrées de l'administration.
+Dans Render, ajoutez la variable `SUPERADMIN_EMAIL` avec votre adresse email (**Environment** > **Add Environment Variable**, puis **Save Changes**). Connectez-vous ensuite sur le site avec un service qui fournit cette adresse ; si elle n'est pas vérifiée par le service, vérifiez-la depuis « Mon espace » (l'envoi des emails doit être configuré, voir plus haut). Le menu burger affiche alors les entrées de l'administration.
 
 #### Base de données Turso (conserver les grilles)
 

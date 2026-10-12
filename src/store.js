@@ -1,6 +1,6 @@
 // Stockage des grilles terminées et des comptes : base Turso en production, fichier SQLite local sinon.
 import { createClient } from '@libsql/client';
-import { createHash, randomBytes, randomUUID } from 'node:crypto';
+import { createHash, randomBytes, randomInt, randomUUID } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { todayInFrance } from './games.js';
@@ -9,6 +9,11 @@ export const GRID_LIFETIME_MS = 30 * 24 * 60 * 60 * 1000;
 export const SESSION_LIFETIME_MS = 30 * 24 * 60 * 60 * 1000;
 // Statistiques anonymes (numéros joués, fréquentation) : gardées 3 ans.
 export const STATS_LIFETIME_MS = 3 * 365 * 24 * 60 * 60 * 1000;
+// Code de connexion envoyé par email, et lien de vérification d'une adresse.
+export const LOGIN_CODE_LIFETIME_MS = 15 * 60 * 1000;
+export const LOGIN_CODE_MAX_ATTEMPTS = 5;
+export const VERIFICATION_LIFETIME_MS = 24 * 60 * 60 * 1000;
+const VERIFICATION_RESEND_MS = 60 * 1000;
 
 // Jour (AAAA-MM-JJ, heure de Paris) d'un instant en millisecondes.
 export const dayOf = (ms) => todayInFrance(new Date(ms));
@@ -21,9 +26,10 @@ function toUser(row) {
     id: row.id,
     provider: row.provider,
     // Tous les fournisseurs liés au compte (même adresse email), dans l'ordre de leur première connexion.
-    providers: row.providers ? String(row.providers).split(',') : [row.provider],
+    providers: row.providers ? [...new Set(String(row.providers).split(','))] : [row.provider],
     name: row.name,
     email: row.email,
+    emailVerified: Boolean(row.email && row.email_verified),
     emailConsent: Boolean(row.email_consent),
     // Seulement pour un administrateur : 'superadmin' ou 'admin'.
     ...(row.role && { role: row.role }),
@@ -44,27 +50,26 @@ function toGrid(row) {
   };
 }
 
-// Mise à niveau des comptes : une adresse email identifie un seul compte, vérifiée par le fournisseur.
-// Les adresses non vérifiées (saisies à la main, ou Microsoft) sont retirées ; les comptes qui ont
-// la même adresse sont fusionnés dans le plus ancien (fournisseurs, grilles, sessions, rôle).
+// Mise à niveau des comptes : une adresse email n'appartient qu'à un compte. Pour chaque adresse
+// partagée, le compte gardé est le plus ancien qui l'a vérifiée (sinon le plus ancien) ; les autres
+// comptes qui l'ont vérifiée y sont fusionnés (fournisseurs, grilles, sessions, rôle), ceux qui ne
+// l'ont pas vérifiée la perdent (rien ne prouve qu'ils appartiennent à la même personne).
 async function mergeAccountsByEmail(db) {
-  await db.batch(
-    [
-      'UPDATE users SET email = NULL, email_consent = 0 WHERE email IS NOT NULL AND email_verified = 0',
-      'INSERT OR IGNORE INTO user_logins (provider, provider_id, user_id, created_at) SELECT provider, provider_id, id, created_at FROM users',
-    ],
-    'write',
-  );
+  await db.execute('INSERT OR IGNORE INTO user_logins (provider, provider_id, user_id, created_at) SELECT provider, provider_id, id, created_at FROM users');
   const { rows } = await db.execute(
-    `SELECT id, lower(email) AS address, is_admin, email_consent FROM users
+    `SELECT id, lower(email) AS address, email_verified, is_admin, email_consent FROM users
     WHERE lower(email) IN (SELECT lower(email) FROM users WHERE email IS NOT NULL GROUP BY lower(email) HAVING COUNT(*) > 1)
-    ORDER BY lower(email), created_at, id`,
+    ORDER BY lower(email), email_verified DESC, created_at, id`,
   );
   const keepers = new Map();
   for (const row of rows) {
     const keep = keepers.get(row.address);
     if (!keep) {
       keepers.set(row.address, row.id);
+      continue;
+    }
+    if (!row.email_verified) {
+      await db.execute({ sql: 'UPDATE users SET email = NULL, email_consent = 0 WHERE id = ?', args: [row.id] });
       continue;
     }
     await db.batch(
@@ -120,8 +125,9 @@ export async function openStore({ url, authToken, file = ':memory:', superadminE
   if (!columns.has('game_type')) await run("ALTER TABLE grids ADD COLUMN game_type TEXT NOT NULL DEFAULT 'loto'");
   if (!columns.has('bonus')) await run('ALTER TABLE grids ADD COLUMN bonus TEXT');
   const gridStatsExisted = Boolean(await first("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'grid_stats'"));
-  // Comptes : pseudo et email (jamais le vrai nom). L'adresse email identifie le compte : elle vient
-  // toujours d'un fournisseur qui l'a vérifiée, et un seul compte peut l'avoir.
+  // Comptes : pseudo et email (jamais le vrai nom). L'adresse email vient toujours d'un fournisseur
+  // de connexion et identifie le compte : un seul compte peut l'avoir. `email_verified` : adresse
+  // vérifiée par le fournisseur, par un code ou par un lien envoyé à cette adresse.
   // `user_logins` : les fournisseurs liés à chaque compte (`users.provider` garde le premier).
   // `email_consent` : accord explicite pour recevoir les résultats par email.
   await db.batch(
@@ -145,6 +151,18 @@ export async function openStore({ url, authToken, file = ':memory:', superadminE
         PRIMARY KEY (provider, provider_id)
       )`,
       'CREATE INDEX IF NOT EXISTS user_logins_user ON user_logins (user_id)',
+      // Codes de connexion (`login`) et liens de vérification (`verify`), stockés hachés.
+      `CREATE TABLE IF NOT EXISTS email_tokens (
+        token_hash TEXT PRIMARY KEY,
+        kind TEXT NOT NULL,
+        user_id TEXT,
+        email TEXT NOT NULL,
+        code_hash TEXT,
+        payload TEXT,
+        attempts INTEGER NOT NULL DEFAULT 0,
+        created_at INTEGER NOT NULL,
+        expires_at INTEGER NOT NULL
+      )`,
       `CREATE TABLE IF NOT EXISTS sessions (
         token_hash TEXT PRIMARY KEY,
         user_id TEXT NOT NULL,
@@ -207,7 +225,10 @@ export async function openStore({ url, authToken, file = ':memory:', superadminE
   const superadmin = typeof superadminEmail === 'string' && superadminEmail.trim() ? superadminEmail.trim() : null;
   const USER_COLUMNS = `users.id, users.provider, users.name, users.email, users.email_consent,
     (SELECT group_concat(provider) FROM (SELECT provider FROM user_logins WHERE user_id = users.id ORDER BY created_at, provider)) AS providers,
+    users.email_verified,
+    -- Un rôle n'est effectif qu'avec une adresse vérifiée.
     CASE
+      WHEN users.email_verified = 0 THEN NULL
       WHEN users.email IS NOT NULL AND lower(users.email) = lower(?) THEN 'superadmin'
       WHEN users.is_admin = 1 THEN 'admin'
     END AS role`;
@@ -215,7 +236,7 @@ export async function openStore({ url, authToken, file = ':memory:', superadminE
     const row = await first(`SELECT ${USER_COLUMNS} FROM users WHERE id = ?`, superadmin, id);
     return row ? toUser(row) : null;
   };
-  const userIdByEmail = async (email) => (await first('SELECT id FROM users WHERE lower(email) = lower(?)', email))?.id;
+  const userByEmail = (email) => first('SELECT id, email_verified FROM users WHERE lower(email) = lower(?)', email);
 
   const bump = (day, metric, key = '') => ({
     sql: `INSERT INTO stats_counters (day, metric, key, count) VALUES (?, ?, ?, 1)
@@ -269,29 +290,42 @@ export async function openStore({ url, authToken, file = ':memory:', superadminE
       const row = await first('SELECT * FROM grids WHERE id = ? AND expires_at > ?', id, now);
       return row ? toGrid(row) : null;
     },
-    // Connexion avec un fournisseur : retrouve le compte déjà lié à ce fournisseur, sinon le compte
-    // qui a la même adresse email (le fournisseur y est alors lié), sinon le compte `linkTo`
-    // (joueur déjà connecté qui ajoute un fournisseur), sinon crée un compte avec ce pseudo.
-    // Seule une adresse vérifiée par le fournisseur est prise en compte. `created` : nouveau compte.
+    // Connexion avec un fournisseur.
+    // 1. Fournisseur déjà lié à un compte : ce compte.
+    // 2. Un compte a déjà cette adresse : si elle est vérifiée des deux côtés, le fournisseur y est lié.
+    //    Si le fournisseur ne l'a pas vérifiée, renvoie { needsCode: true } : la connexion attend un code
+    //    envoyé à cette adresse (puis reprend avec emailVerified). Si seul le compte existant ne l'a pas
+    //    vérifiée, rien ne prouve qu'il appartient à la même personne : il perd l'adresse.
+    // 3. Sinon le compte `linkTo` (joueur déjà connecté qui ajoute un fournisseur), ou un nouveau compte.
+    // `created` : nouveau compte.
     async upsertUser({ provider, providerId, name, email = null, emailVerified = false, linkTo = null }, now = Date.now()) {
-      const address = email && emailVerified ? email : null;
+      const verified = emailVerified ? 1 : 0;
       let userId = (await first('SELECT user_id FROM user_logins WHERE provider = ? AND provider_id = ?', provider, providerId))?.user_id;
       let created = false;
       if (!userId) {
-        userId = (address && (await userIdByEmail(address))) || (linkTo && (await selectUser(linkTo))?.id);
+        const holder = email ? await userByEmail(email) : null;
+        if (holder && !verified) return { needsCode: true, email };
+        if (holder && holder.email_verified) userId = holder.id;
+        else if (holder) await run('UPDATE users SET email = NULL, email_verified = 0, email_consent = 0 WHERE id = ?', holder.id);
+        userId ??= linkTo && (await selectUser(linkTo))?.id;
         if (!userId) {
           userId = randomUUID();
           created = true;
           await run(
-            'INSERT INTO users (id, provider, provider_id, name, email, email_verified, created_at) VALUES (?, ?, ?, ?, ?, 1, ?)',
-            userId, provider, providerId, name, address, now,
+            'INSERT INTO users (id, provider, provider_id, name, email, email_verified, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            userId, provider, providerId, name, email, email ? verified : 0, now,
           );
         }
         await run('INSERT OR IGNORE INTO user_logins (provider, provider_id, user_id, created_at) VALUES (?, ?, ?, ?)', provider, providerId, userId, now);
       }
-      // Un compte sans adresse prend celle du fournisseur, si aucun autre compte ne l'a.
-      if (address && !(await userIdByEmail(address))) {
-        await run('UPDATE users SET email = ?, email_verified = 1 WHERE id = ? AND email IS NULL', address, userId);
+      if (email) {
+        const holder = await userByEmail(email);
+        if (!holder) {
+          // Un compte sans adresse prend celle du fournisseur.
+          await run('UPDATE users SET email = ?, email_verified = ? WHERE id = ? AND email IS NULL', email, verified, userId);
+        } else if (holder.id === userId && verified) {
+          await run('UPDATE users SET email_verified = 1 WHERE id = ?', userId);
+        }
       }
       await db.batch(
         [{ sql: 'UPDATE users SET last_login_at = ? WHERE id = ?', args: [now, userId] }, bump(dayOf(now), created ? 'signup' : 'login', provider)],
@@ -299,10 +333,67 @@ export async function openStore({ url, authToken, file = ':memory:', superadminE
       );
       return { ...(await selectUser(userId)), created };
     },
-    // Pseudo et accord d'envoi des résultats (qui demande une adresse email). L'adresse, elle,
+    // Pseudo et accord d'envoi des résultats (qui demande une adresse vérifiée). L'adresse, elle,
     // vient toujours du fournisseur de connexion.
     async updateUser(id, { name, emailConsent }) {
-      await run('UPDATE users SET name = ?, email_consent = CASE WHEN email IS NULL THEN 0 ELSE ? END WHERE id = ?', name, emailConsent ? 1 : 0, id);
+      await run(
+        'UPDATE users SET name = ?, email_consent = CASE WHEN email IS NOT NULL AND email_verified = 1 THEN ? ELSE 0 END WHERE id = ?',
+        name, emailConsent ? 1 : 0, id,
+      );
+    },
+
+    // Connexion en attente d'un code envoyé par email. `pending` : la connexion à reprendre.
+    // Renvoie le jeton (gardé dans un cookie) et le code (envoyé par email).
+    async createLoginCode(pending, now = Date.now()) {
+      const token = randomBytes(24).toString('base64url');
+      const code = String(randomInt(0, 1_000_000)).padStart(6, '0');
+      await run(
+        `INSERT INTO email_tokens (token_hash, kind, email, code_hash, payload, created_at, expires_at)
+        VALUES (?, 'login', ?, ?, ?, ?, ?)`,
+        hash(token), pending.email, hash(`${token}|${code}`), JSON.stringify(pending), now, now + LOGIN_CODE_LIFETIME_MS,
+      );
+      return { token, code };
+    },
+    async getLoginCode(token, now = Date.now()) {
+      if (typeof token !== 'string') return null;
+      const row = await first("SELECT email FROM email_tokens WHERE token_hash = ? AND kind = 'login' AND expires_at > ?", hash(token), now);
+      return row ? { email: row.email } : null;
+    },
+    // Renvoie la connexion en attente si le code est bon ; un code ne sert qu'une fois,
+    // et il est annulé après trop d'essais.
+    async checkLoginCode(token, code, now = Date.now()) {
+      if (typeof token !== 'string') return { error: 'expired' };
+      const row = await first("SELECT * FROM email_tokens WHERE token_hash = ? AND kind = 'login' AND expires_at > ?", hash(token), now);
+      if (!row || row.attempts >= LOGIN_CODE_MAX_ATTEMPTS) return { error: 'expired' };
+      const given = String(code ?? '').replaceAll(/\s/g, '');
+      if (hash(`${token}|${given}`) !== row.code_hash) {
+        await run('UPDATE email_tokens SET attempts = attempts + 1 WHERE token_hash = ?', row.token_hash);
+        return { error: row.attempts + 1 >= LOGIN_CODE_MAX_ATTEMPTS ? 'expired' : 'invalid' };
+      }
+      await run('DELETE FROM email_tokens WHERE token_hash = ?', row.token_hash);
+      return { pending: JSON.parse(row.payload) };
+    },
+    // Lien de vérification de l'adresse du compte (au plus un par minute).
+    async createVerification(userId, now = Date.now()) {
+      const user = await first('SELECT email, email_verified FROM users WHERE id = ?', userId);
+      if (!user?.email || user.email_verified) return null;
+      const recent = await first("SELECT 1 FROM email_tokens WHERE kind = 'verify' AND user_id = ? AND created_at > ?", userId, now - VERIFICATION_RESEND_MS);
+      if (recent) return { tooSoon: true };
+      const token = randomBytes(32).toString('base64url');
+      await run(
+        "INSERT INTO email_tokens (token_hash, kind, user_id, email, created_at, expires_at) VALUES (?, 'verify', ?, ?, ?, ?)",
+        hash(token), userId, user.email, now, now + VERIFICATION_LIFETIME_MS,
+      );
+      return { token, email: user.email };
+    },
+    // Vérifie l'adresse si le lien est valable et que le compte a toujours cette adresse.
+    async verifyEmail(token, now = Date.now()) {
+      if (typeof token !== 'string') return false;
+      const row = await first("SELECT user_id, email FROM email_tokens WHERE token_hash = ? AND kind = 'verify' AND expires_at > ?", hash(token), now);
+      if (!row) return false;
+      const result = await run('UPDATE users SET email_verified = 1 WHERE id = ? AND lower(email) = lower(?)', row.user_id, row.email);
+      await run("DELETE FROM email_tokens WHERE kind = 'verify' AND user_id = ?", row.user_id);
+      return changes(result) > 0;
     },
     async createSession(userId, now = Date.now()) {
       const token = randomBytes(32).toString('base64url');
@@ -349,6 +440,7 @@ export async function openStore({ url, authToken, file = ':memory:', superadminE
           { sql: 'UPDATE grid_players SET user_id = NULL WHERE user_id = ?', args: [userId] },
           { sql: 'DELETE FROM sessions WHERE user_id = ?', args: [userId] },
           { sql: 'DELETE FROM user_logins WHERE user_id = ?', args: [userId] },
+          { sql: 'DELETE FROM email_tokens WHERE user_id = ?', args: [userId] },
           { sql: 'DELETE FROM users WHERE id = ?', args: [userId] },
         ],
         'write',
@@ -361,6 +453,7 @@ export async function openStore({ url, authToken, file = ':memory:', superadminE
           { sql: 'DELETE FROM grids WHERE expires_at <= ?', args: [now] },
           'DELETE FROM grid_players WHERE grid_id NOT IN (SELECT id FROM grids)',
           { sql: 'DELETE FROM sessions WHERE expires_at <= ?', args: [now] },
+          { sql: 'DELETE FROM email_tokens WHERE expires_at <= ?', args: [now] },
           { sql: 'DELETE FROM grid_stats WHERE created_at <= ?', args: [now - STATS_LIFETIME_MS] },
           { sql: 'DELETE FROM stats_counters WHERE day <= ?', args: [dayOf(now - STATS_LIFETIME_MS)] },
           { sql: 'DELETE FROM stats_visitors WHERE day < ?', args: [today] },
@@ -423,7 +516,7 @@ export async function openStore({ url, authToken, file = ':memory:', superadminE
       const [users, grids, stats] = await db.batch(
         [
           {
-            sql: `SELECT COUNT(*) AS total, SUM(created_at > ?) AS recent, SUM(is_admin) AS admins,
+            sql: `SELECT COUNT(*) AS total, SUM(created_at > ?) AS recent, SUM(is_admin = 1 AND email_verified = 1) AS admins,
               SUM(email IS NOT NULL AND email_consent = 1) AS consents FROM users`,
             args: [now - 30 * 86_400_000],
           },
@@ -465,8 +558,9 @@ export async function openStore({ url, authToken, file = ':memory:', superadminE
         grids: Number(row.grids),
       }));
     },
+    // Le rôle admin n'est donné qu'à un compte dont l'adresse est vérifiée.
     async setAdmin(id, admin) {
-      return changes(await run('UPDATE users SET is_admin = ? WHERE id = ?', admin ? 1 : 0, id)) > 0;
+      return changes(await run('UPDATE users SET is_admin = ? WHERE id = ? AND (? = 0 OR (email IS NOT NULL AND email_verified = 1))', admin ? 1 : 0, id, admin ? 1 : 0)) > 0;
     },
     close() {
       db.close();

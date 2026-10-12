@@ -216,7 +216,7 @@ function userGrids(grids) {
 function userItem(user, { canManage }) {
   const details = [
     user.providers.map((p) => PROVIDERS[p] ?? p).join(', '),
-    user.email ?? 'sans email',
+    user.email ? `${user.email} (${user.emailVerified ? 'vérifiée' : 'non vérifiée'})` : 'sans email',
     user.emailConsent ? 'accepte les résultats par email' : null,
     `inscrit le ${longDate(user.createdAt)}`,
     user.lastLoginAt ? `dernière connexion le ${longDate(user.lastLoginAt)}` : null,
@@ -247,6 +247,11 @@ function userItem(user, { canManage }) {
 
   if (canManage && user.role !== 'superadmin') {
     const toggle = button(user.role === 'admin' ? 'Retirer le rôle admin' : 'Nommer admin', 'small');
+    // Le rôle admin n'est donné qu'à un compte dont l'adresse est vérifiée.
+    if (user.role !== 'admin' && !user.emailVerified) {
+      toggle.disabled = true;
+      toggle.title = 'Adresse email non vérifiée';
+    }
     toggle.addEventListener('click', async () => {
       const makeAdmin = user.role !== 'admin';
       const question = makeAdmin ? `Nommer ${user.name} administrateur ? Il verra les comptes, leurs emails et les statistiques.` : `Retirer le rôle admin à ${user.name} ?`;
@@ -293,7 +298,7 @@ async function renderUsers() {
         'p',
         'small muted',
         superadminEmail
-          ? `Superadmin : ${superadminEmail}${superadminExists ? '' : ' (son compte n’existe pas encore : il sera créé à sa première connexion avec un service qui fournit cette adresse)'}.`
+          ? `Superadmin : ${superadminEmail}${superadminExists ? '' : ' (pas encore actif : le compte qui a cette adresse n’existe pas encore ou ne l’a pas vérifiée)'}.`
           : 'Aucun superadmin défini (variable SUPERADMIN_EMAIL).',
         canManage ? ' Vous pouvez nommer ou retirer les administrateurs.' : ' Seul le superadmin peut nommer ou retirer les administrateurs.',
       ),

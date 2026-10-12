@@ -19,6 +19,7 @@ import {
 } from './game.js';
 import { validateDrawDate } from './drawDate.js';
 import { createAuth } from './auth.js';
+import { createMailer } from './mail.js';
 import { createAdmin } from './admin.js';
 import { pageViewTracker } from './stats.js';
 
@@ -59,6 +60,7 @@ export function createApp({
   finishedRoomTtlMs = 10 * 60_000,
   maxRooms = 1000,
   env = process.env,
+  mailer = createMailer(env),
 } = {}) {
   const rooms = new Map();
 
@@ -67,7 +69,7 @@ export function createApp({
   // Derrière le proxy HTTPS de l'hébergeur : nécessaire pour les cookies « Secure ».
   app.set('trust proxy', 1);
   app.use(express.json({ limit: '4kb' }));
-  const auth = createAuth({ store, env, findRoomId: (id) => rooms.get(id)?.id });
+  const auth = createAuth({ store, env, mailer, findRoomId: (id) => rooms.get(id)?.id });
   app.use(auth.router);
   app.use(createAdmin({ store, currentUser: auth.currentUser, live: () => liveRooms() }).router);
   app.use(pageViewTracker({ store, env }));
