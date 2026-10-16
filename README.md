@@ -66,7 +66,7 @@ Le jeu est choisi à la création du salon :
   - **Mode classique** : assez de numéros pour que la grille soit complétée à coup sûr, quoi que choisissent les autres. Avec `n` joueurs et un jeu de `N` numéros dont `c` à trouver, chacun en classe au moins ⌈(c + (n − 1) × N) / n⌉. Au Loto : 27 numéros et 6 numéros chance à 2 joueurs, 35 et 7 à 3 joueurs, 46 et 10 à 12 joueurs.
   - **Mode éclair** : deux fois le nombre à trouver (au Loto, 10 numéros et 2 numéros chance). Si la simulation ne remplit pas la grille, les places restantes vont aux numéros classés par le plus de joueurs, puis au meilleur rang moyen, puis au plus petit. La page de la grille signale ces numéros « complétés ».
 - Le joueur peut modifier son classement tant que tout le monde n'a pas répondu. Les classements des autres restent secrets : on voit seulement qui a répondu, et quand.
-- Quand le dernier joueur a répondu, **la partie est simulée tour par tour** : au tour k, chaque joueur joue le k-ième numéro de son classement, et un numéro est validé dès qu'il figure dans les k premiers de chacun. Les règles sont celles du direct (numéros validés en surnombre gardés, numéros complémentaires ensuite). La page de la grille indique le tour simulé où chaque numéro a été validé.
+- Quand le dernier joueur a répondu, **la partie est simulée tour par tour** : au tour k, chaque joueur joue le k-ième numéro de son classement, et un numéro est validé dès qu'il figure dans les k premiers de chacun. Les règles sont celles du direct (numéros validés en surnombre gardés, numéros complémentaires ensuite).
 - Chaque joueur connecté peut cocher « Recevoir la grille par email » (coché par défaut) : la grille lui est alors envoyée avec son lien, si son adresse email est vérifiée. Les joueurs connectés la retrouvent aussi dans « Mon espace ».
 - Si un joueur ne répond pas, le créateur peut le retirer dès que 2 joueurs ont répondu : la grille est calculée sans lui. Sans réponse de tous, la partie expire à la fin des prises de jeu du tirage prévu, ou au bout de 30 jours sans date de tirage.
 
@@ -77,7 +77,7 @@ L'entrée « Mes parties en cours » du menu liste le salon en direct où l'on j
 ### 5. Après la partie
 
 - Les joueurs jouent la grille co-créée comme ils le souhaitent : en point de vente, sur le site de la FDJ, chacun de leur côté, ou ensemble en partageant les gains.
-- La grille reste consultable **30 jours** après sa création grâce à l'**URL unique** de la partie (`/grille/...`), que l'on peut copier ou partager depuis l'écran de fin.
+- La grille reste consultable **30 jours** après sa création grâce à l'**URL unique** de la partie (`/grille/...`), que l'on peut copier ou partager depuis l'écran de fin. Elle indique à quel tour chaque numéro a été validé.
 - Un joueur connecté retrouve toutes ses grilles dans **« Mon espace »**, où il voit son adresse email, peut modifier son pseudo, accepter de recevoir les résultats par email, et supprimer son compte. Un joueur qui a joué sans compte se voit proposer, à la fin de la partie, de se connecter : la grille qu'il vient de co-créer est alors ajoutée à son espace.
 - Si une date de tirage a été indiquée, elle s'affiche sur la page de la grille. À terme, le résultat de la grille sera évalué à la publication des résultats officiels et affiché sur cette page, et les joueurs qui ont renseigné leur adresse email et donné leur accord le **recevront par email** (pas encore disponible, voir « Prochaines étapes »).
 

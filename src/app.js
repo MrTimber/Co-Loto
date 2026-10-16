@@ -241,6 +241,9 @@ export function createApp({
         bonus: game.validated[GAMES[game.gameType].phases[1].key],
         players: game.players.map((p) => p.name),
         rounds: game.rounds.length,
+        validatedRounds: game.rounds
+          .filter((r) => r.newlyValidated.length)
+          .map((r) => ({ round: r.round, phase: r.phase, numbers: r.newlyValidated })),
         drawDate: game.drawDate,
         participants: participantsOf(room),
       }).catch((err) => console.error('Enregistrement de la grille impossible :', err.message));

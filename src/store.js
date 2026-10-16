@@ -52,7 +52,9 @@ function toGrid(row) {
     players: JSON.parse(row.players),
     rounds: row.rounds,
     // Partie à distance : chaque joueur a classé ses numéros, la partie a été simulée.
-    ...(row.mode === 'async' && { mode: 'async', validatedRounds: JSON.parse(row.validated_rounds ?? '[]') }),
+    ...(row.mode === 'async' && { mode: 'async' }),
+    // Tours où des numéros ont été validés (absents des grilles enregistrées avant leur ajout).
+    ...(row.validated_rounds && { validatedRounds: JSON.parse(row.validated_rounds) }),
   };
 }
 
@@ -367,7 +369,7 @@ export async function openStore({ url, authToken, file = ':memory:', superadminE
   return {
     // `bonus` : numéros complémentaires (numéro chance, étoiles ou numéro Dream).
     // `participants` : jeton et pseudo de chaque joueur, pour rattacher plus tard la grille à son compte.
-    // Partie à distance : `mode` = 'async' et `validatedRounds` ; ses participants connectés
+    // `validatedRounds` : tours où des numéros ont été validés. Partie à distance : `mode` = 'async' ; ses participants connectés
     // (`userId`) retrouvent directement la grille dans leur espace.
     async saveGrid({ id, gameType = DEFAULT_GAME, numbers, bonus, players, rounds, drawDate = null, participants = [], mode = null, validatedRounds = null }, now = Date.now()) {
       await db.batch(

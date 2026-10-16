@@ -35,7 +35,7 @@ try {
       ? el('p', '', 'Co-créée à distance par ', ...listNames(body.players), ` le ${created} : chacun a classé ses numéros, et la partie a été simulée en ${body.rounds} tours.`)
       : el('p', '', 'Co-créée par ', ...listNames(body.players), ` en ${body.rounds} tours, le ${created}.`),
   );
-  if (body.mode === 'async' && body.validatedRounds.length) {
+  if (body.validatedRounds?.length) {
     // Tour simulé où chaque numéro a été validé.
     card.append(
       el('details', 'small', el('summary', '', 'Voir à quel tour chaque numéro a été validé'),
