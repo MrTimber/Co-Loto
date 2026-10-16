@@ -144,6 +144,21 @@ function statsDrawDate(gameType, drawDate, createdAt) {
   return drawDate ?? nextDrawDate(getGame(gameType) ?? GAMES[DEFAULT_GAME], new Date(createdAt));
 }
 
+// Parties à distance qui attendent encore des classements (avant leur date limite) : par mode et
+// par jeu, places et classements reçus, et parties dont la date limite tombe dans les 24 heures.
+function remoteSummary(rows, now) {
+  const summary = { games: 0, variants: { full: 0, quick: 0 }, byGame: {}, seats: 0, submitted: 0, endingSoon: 0 };
+  for (const r of rows) {
+    summary.games += 1;
+    summary.variants[r.variant] = (summary.variants[r.variant] ?? 0) + 1;
+    summary.byGame[r.game_type] = (summary.byGame[r.game_type] ?? 0) + 1;
+    summary.seats += Number(r.seats);
+    summary.submitted += Number(r.submitted ?? 0);
+    if (Number(r.deadline) <= now + 86_400_000) summary.endingSoon += 1;
+  }
+  return summary;
+}
+
 // Mode de jeu d'une grille dans les statistiques : en direct (live), ou à distance en mode
 // classique (full) ou éclair (quick).
 export const PLAY_MODES = ['live', 'full', 'quick'];
@@ -805,7 +820,13 @@ export async function openStore({ url, authToken, file = ':memory:', superadminE
           { sql: 'SELECT COUNT(*) AS total FROM grids WHERE expires_at > ?', args: [now] },
           { sql: 'SELECT game_type, COUNT(*) AS total, SUM(day >= ?) AS recent, AVG(players) AS players, AVG(rounds) AS rounds FROM grid_stats GROUP BY game_type', args: [sinceDay] },
           { sql: 'SELECT mode, COUNT(*) AS total, SUM(day >= ?) AS recent, AVG(players) AS players, AVG(rounds) AS rounds FROM grid_stats GROUP BY mode', args: [sinceDay] },
-          { sql: "SELECT variant, COUNT(*) AS total FROM async_games WHERE status = 'waiting' AND expires_at > ? GROUP BY variant", args: [now] },
+          {
+            sql: `SELECT async_games.variant, async_games.game_type, async_games.deadline, COUNT(async_seats.link) AS seats,
+                SUM(async_seats.submitted_at IS NOT NULL) AS submitted
+              FROM async_games LEFT JOIN async_seats ON async_seats.game_id = async_games.id AND async_seats.removed = 0
+              WHERE async_games.status = 'waiting' AND async_games.deadline > ? GROUP BY async_games.id`,
+            args: [now],
+          },
         ],
         'read',
       );
@@ -827,8 +848,7 @@ export async function openStore({ url, authToken, file = ':memory:', superadminE
           averagePlayers: Number(r.players),
           averageRounds: Number(r.rounds),
         })),
-        // Parties à distance qui attendent encore des classements, par mode.
-        waiting: Object.fromEntries(waiting.rows.map((r) => [r.variant, Number(r.total)])),
+        remote: remoteSummary(waiting.rows, now),
       };
     },
 

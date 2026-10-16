@@ -129,7 +129,7 @@ Pages :
 
 | Page | Contenu |
 |---|---|
-| `/admin` (tableau de bord) | Salons et joueurs en ce moment, parties à distance en attente (classique et éclair), visites, parties créées, grilles co-créées, comptes, grilles par jeu et par mode de jeu (joueurs et tours en moyenne) |
+| `/admin` (tableau de bord) | En ce moment, en deux zones : parties en direct (salons en attente, parties en cours, joueurs, connexions temps réel) et parties à distance (parties en attente en classique et éclair, classements reçus, joueurs attendus, parties dont la date limite tombe dans les 24 h) ; visites, parties créées, grilles co-créées, comptes, grilles par jeu et par mode de jeu (joueurs et tours en moyenne) |
 | `/admin/utilisateurs` | Liste des comptes (pseudo, services de connexion liés, email, inscription, dernière connexion, rôle), recherche, grilles co-créées par chacun (avec leur mode de jeu), nomination des administrateurs |
 | `/admin/frequentation` | Visiteurs et pages vues par jour (ou par semaine), grilles co-créées, pages les plus vues, sites d'origine, appareils, parties créées et grilles co-créées par jeu et par mode de jeu, inscriptions et connexions par fournisseur, sur 7 jours à 12 mois |
 | `/admin/numeros` | Numéros et numéros complémentaires les plus joués pour chaque jeu, pour tous les modes de jeu ou un seul, sur une période d'un jour à un an, ou pour un tirage précis |
