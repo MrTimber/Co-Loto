@@ -232,7 +232,10 @@ function phaseSection(phase, isBonus) {
       cell.querySelector('.rank').textContent = rank === -1 ? '' : rank + 1;
       cell.setAttribute('aria-label', rank === -1 ? String(n) : `${n}, classé${phase.feminine ? 'e' : ''} ${rank + 1}${rank === 0 ? (phase.feminine ? 're' : 'er') : 'e'}`);
     }
-    order.replaceChildren(...list.map((n) => el('li', '', String(n))));
+    // Un rang par ligne : « 1er · 7 », « 2e · 12 »…
+    order.replaceChildren(
+      ...list.map((n, i) => el('li', '', el('span', 'rank-label', i === 0 ? (phase.feminine ? '1re' : '1er') : `${i + 1}e`), el('span', `ball ${isBonus ? 'bonus' : 'validated'}`, String(n)))),
+    );
     saveDraft();
   };
   for (let n = phase.min; n <= phase.max; n++) {
