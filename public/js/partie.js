@@ -85,7 +85,7 @@ function linkBox(url, label, { subject, text }) {
   });
   const actions = el('div', 'invite-actions', copy);
   if (prefersShareSheet()) {
-    const share = el('button', 'small', 'Partager…');
+    const share = el('button', 'small', 'Partager');
     share.type = 'button';
     share.addEventListener('click', () => navigator.share({ title: 'Co-Loto', text, url }).catch(() => {}));
     actions.append(share);
