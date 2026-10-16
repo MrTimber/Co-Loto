@@ -63,6 +63,19 @@ export function findPhase(game, key) {
   return game.phases.find((p) => p.key === key) ?? null;
 }
 
+// Partie à distance : chaque joueur classe au moins ce nombre de numéros de la phase, par ordre
+// de préférence. Mode classique (`full`) : avec `players` classements de cette longueur, au
+// moins `count` numéros sont communs à tous, la partie simulée tour par tour se termine donc à coup
+// sûr. Mode éclair (`quick`) : deux fois le nombre à trouver ; la grille est complétée si la
+// simulation ne suffit pas (voir async.js).
+export const RANKING_VARIANTS = ['full', 'quick'];
+
+export function minRanking(phase, players, variant = 'full') {
+  const size = phase.max - phase.min + 1;
+  if (variant === 'quick') return Math.min(size, 2 * phase.count);
+  return Math.min(size, Math.ceil((phase.count + (players - 1) * size) / players));
+}
+
 function binomial(n, k) {
   let result = 1;
   for (let i = 1; i <= k; i++) result = (result * (n - k + i)) / i;

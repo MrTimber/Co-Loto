@@ -21,6 +21,7 @@ import { validateDrawDate } from './drawDate.js';
 import { createAuth } from './auth.js';
 import { createMailer } from './mail.js';
 import { createAdmin } from './admin.js';
+import { createAsyncGames } from './asyncGames.js';
 import { pageViewTracker } from './stats.js';
 
 const PUBLIC_DIR = fileURLToPath(new URL('../public/', import.meta.url));
@@ -75,9 +76,13 @@ export function createApp({
   app.disable('x-powered-by');
   // Derrière le proxy HTTPS de l'hébergeur : nécessaire pour les cookies « Secure ».
   app.set('trust proxy', 1);
+  // « Mes parties en cours » reçoit les jetons de toutes les parties jouées sur l'appareil.
+  app.use('/api/mes-parties', express.json({ limit: '64kb' }));
   app.use(express.json({ limit: '4kb' }));
   const auth = createAuth({ store, env, mailer, findRoomId: (id) => rooms.get(id)?.id });
   app.use(auth.router);
+  const asyncGames = createAsyncGames({ store, mailer, currentUser: auth.currentUser, baseUrl: auth.baseUrl });
+  app.use(asyncGames.router);
   app.use(createAdmin({ store, currentUser: auth.currentUser, live: () => liveRooms() }).router);
   app.use(pageViewTracker({ store, env }));
   // Les règles des jeux sont partagées avec le navigateur.
@@ -88,6 +93,8 @@ export function createApp({
   app.get('/mes-grilles', (req, res) => res.redirect(301, '/mon-espace'));
   app.get('/salon/:id', (req, res) => res.sendFile('salon.html', { root: PUBLIC_DIR }));
   app.get('/grille/:id', (req, res) => res.sendFile('grille.html', { root: PUBLIC_DIR }));
+  app.get('/mes-parties', (req, res) => res.sendFile('mes-parties.html', { root: PUBLIC_DIR }));
+  app.get('/partie/:link', (req, res) => res.sendFile('partie.html', { root: PUBLIC_DIR }));
 
   app.get('/api/lobbies', (req, res) => {
     const lobbies = [];
@@ -123,6 +130,46 @@ export function createApp({
       res.status(201).json({ roomId: id, playerId, token });
     } catch (err) {
       res.status(400).json({ error: err.message });
+    }
+  });
+
+  // Parties en cours : salons en direct où l'appareil joue encore (son jeton y est toujours valable),
+  // et parties à distance (celles de l'appareil et celles du compte connecté).
+  // `parties` : [{ id, token }], les jetons gardés par le navigateur.
+  app.post('/api/mes-parties', async (req, res) => {
+    res.set('cache-control', 'no-store');
+    const pairs = (Array.isArray(req.body?.parties) ? req.body.parties : [])
+      .slice(0, 500)
+      .filter((p) => typeof p?.id === 'string' && typeof p?.token === 'string');
+    const live = [];
+    const links = [];
+    for (const { id, token } of pairs) {
+      const room = rooms.get(id);
+      const playerId = room?.tokens.get(token);
+      if (!playerId) {
+        links.push(token);
+        continue;
+      }
+      const { game } = room;
+      if (game.status !== 'lobby' && game.status !== 'playing') continue;
+      live.push({
+        kind: 'live',
+        url: `/salon/${id}`,
+        gameType: game.gameType,
+        status: game.status,
+        round: game.round,
+        drawDate: game.drawDate,
+        maxPlayers: game.maxPlayers,
+        isHost: game.hostId === playerId,
+        players: game.players.map((p) => ({ name: p.name, me: p.id === playerId, online: isOnline(room, p.id) })),
+      });
+    }
+    try {
+      const user = await auth.currentUser(req);
+      res.json([...live, ...(await asyncGames.ongoing(user, links))]);
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Liste indisponible.' });
     }
   });
 
@@ -194,6 +241,9 @@ export function createApp({
         bonus: game.validated[GAMES[game.gameType].phases[1].key],
         players: game.players.map((p) => p.name),
         rounds: game.rounds.length,
+        validatedRounds: game.rounds
+          .filter((r) => r.newlyValidated.length)
+          .map((r) => ({ round: r.round, phase: r.phase, numbers: r.newlyValidated })),
         drawDate: game.drawDate,
         participants: participantsOf(room),
       }).catch((err) => console.error('Enregistrement de la grille impossible :', err.message));

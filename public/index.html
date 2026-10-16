@@ -33,7 +33,13 @@
       <section class="card">
         <h2>Créer un salon</h2>
         <form id="create-form">
-          <label>Votre pseudo
+          <fieldset class="mode-picker">
+            <legend>Mode de jeu</legend>
+            <label class="inline"><input type="radio" name="mode" value="live" checked> En direct, tous ensemble, tour par tour</label>
+            <label class="inline"><input type="radio" name="mode" value="async"> À distance, chacun quand il veut</label>
+            <p class="muted small" id="mode-hint"></p>
+          </fieldset>
+          <label id="name-field">Votre pseudo
             <input name="name" required maxlength="24" autocomplete="nickname">
           </label>
           <fieldset class="game-picker">
@@ -42,10 +48,19 @@
             <label class="game-option" data-game="euromillions"><input type="radio" name="gameType" value="euromillions"> Euromillions</label>
             <label class="game-option" data-game="eurodreams"><input type="radio" name="gameType" value="eurodreams"> EuroDreams</label>
           </fieldset>
-          <label>Nombre maximum de joueurs
+          <label id="max-players-field">Nombre maximum de joueurs
             <select name="maxPlayers"></select>
           </label>
-          <fieldset>
+          <label id="players-field" hidden>Nombre de joueurs, vous compris
+            <select name="players"></select>
+          </label>
+          <fieldset id="variant-field" hidden>
+            <legend>Mode de la partie à distance</legend>
+            <label class="inline"><input type="radio" name="variant" value="full" checked> <span data-variant="full"></span></label>
+            <label class="inline"><input type="radio" name="variant" value="quick"> <span data-variant="quick"></span></label>
+            <p class="muted small" id="variant-hint"></p>
+          </fieldset>
+          <fieldset id="visibility-field">
             <legend>Accès</legend>
             <label class="inline"><input type="radio" name="visibility" value="private" checked> Privé, sur invitation par lien</label>
             <label class="inline"><input type="radio" name="visibility" value="public"> Public, visible dans la liste des salons</label>

@@ -43,3 +43,12 @@ export function verificationEmail(baseUrl, token) {
   const text = `Pour vérifier votre adresse email sur Co-Loto, ouvrez ce lien :\n${link}\n\nIl est valable 24 heures. Si vous n'avez pas fait cette demande, ignorez cet email.${SIGNATURE}`;
   return { subject: 'Co-Loto : vérifiez votre adresse email', text, preview: `lien de vérification ${path}` };
 }
+
+// Résultat d'une partie à distance : la grille vient d'être simulée.
+export function asyncResultEmail(baseUrl, gridId, rules, numbers, bonus) {
+  const path = `/grille/${encodeURIComponent(gridId)}`;
+  const [, extra] = rules.phases;
+  const extraLabel = bonus.length > 1 ? extra.many : extra.one;
+  const text = `Tous les joueurs ont classé leurs numéros : votre grille ${rules.name} co-créée est prête !\n\nNuméros : ${numbers.join(', ')}\n${extraLabel[0].toUpperCase()}${extraLabel.slice(1)} : ${bonus.join(', ')}\n\nRetrouvez-la pendant 30 jours à cette adresse, ou dans « Mon espace » :\n${baseUrl}${path}${SIGNATURE}`;
+  return { subject: `Co-Loto : votre grille ${rules.name} est prête`, text, preview: `grille à distance prête ${path}` };
+}

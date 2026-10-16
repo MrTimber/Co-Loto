@@ -31,8 +31,27 @@ try {
   card.replaceChildren(
     el('h1', '', `Votre grille ${rules.name}`),
     overflow ? options : el('div', 'summary big', ...ballNodes(body.numbers, body.bonus)),
-    el('p', '', 'Co-créée par ', ...listNames(body.players), ` en ${body.rounds} tours, le ${created}.`),
+    body.mode === 'async'
+      ? el('p', '', 'Co-créée à distance par ', ...listNames(body.players), ` le ${created} : chacun a classé ses numéros, et la partie a été simulée en ${body.rounds} tours.`)
+      : el('p', '', 'Co-créée par ', ...listNames(body.players), ` en ${body.rounds} tours, le ${created}.`),
   );
+  if (body.validatedRounds?.length) {
+    // Tour simulé où chaque numéro a été validé.
+    card.append(
+      el('details', 'small', el('summary', '', 'Voir à quel tour chaque numéro a été validé'),
+        el('ul', 'validated-rounds', ...body.validatedRounds.map((r) => {
+          const phaseIndex = rules.phases.findIndex((p) => p.key === r.phase);
+          const phase = rules.phases[phaseIndex];
+          const label = r.completed ? `${phase.many[0].toUpperCase()}${phase.many.slice(1)} complété${phase.feminine ? 'e' : ''}s : ` : `Tour ${r.round} : `;
+          return el('li', '', label, ...r.numbers.map((n) => el('span', `ball ${phaseIndex > 0 ? 'bonus' : 'validated'}`, String(n))));
+        }))),
+    );
+    // Mode éclair : numéros ajoutés parce que la simulation n'a pas rempli la grille.
+    const completed = body.validatedRounds.filter((r) => r.completed).flatMap((r) => r.numbers);
+    if (completed.length) {
+      card.append(el('p', 'small muted', `Les classements n'ont pas suffi à tout trouver ensemble : ${completed.join(', ')} ${completed.length > 1 ? 'ont été ajoutés' : 'a été ajouté'} parce que ${completed.length > 1 ? 'ce sont les numéros les mieux classés' : 'c’est le numéro le mieux classé'} par l'ensemble des joueurs.`));
+    }
+  }
   if (body.drawDate) {
     card.append(el('p', '', `Tirage prévu : ${formatDrawDate(body.drawDate)}. La vérification des résultats arrivera dans une prochaine version.`));
   }

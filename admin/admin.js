@@ -7,7 +7,7 @@ import { ADMIN_PAGES } from './menu.js';
 const view = document.getElementById('admin-view');
 const section = location.pathname.split('/')[2] ?? '';
 const PROVIDERS = { google: 'Google', microsoft: 'Microsoft', github: 'GitHub', discord: 'Discord', facebook: 'Facebook', dev: 'Compte de test' };
-const PAGE_NAMES = { '/': 'Accueil', '/salon': 'Salons', '/grille': 'Grilles co-créées', '/connexion': 'Connexion', '/mon-espace': 'Mon espace', '/confidentialite': 'Confidentialité' };
+const PAGE_NAMES = { '/': 'Accueil', '/salon': 'Salons', '/partie': 'Parties à distance', '/mes-parties': 'Mes parties en cours', '/grille': 'Grilles co-créées', '/connexion': 'Connexion', '/mon-espace': 'Mon espace', '/confidentialite': 'Confidentialité' };
 const number = new Intl.NumberFormat('fr-FR');
 const decimal = new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 1 });
 const percent = new Intl.NumberFormat('fr-FR', { style: 'percent', maximumFractionDigits: 1 });

@@ -151,7 +151,7 @@ export function isEmail(value) {
 }
 
 const DEFAULT_RETURN = '/mon-espace';
-const STATIC_RETURNS = new Map(['/', '/mon-espace', '/confidentialite'].map((path) => [path, path]));
+const STATIC_RETURNS = new Map(['/', '/mon-espace', '/mes-parties', '/confidentialite'].map((path) => [path, path]));
 
 // « alice@example.com » devient « a•••@example.com ».
 export function maskEmail(email) {
@@ -173,6 +173,10 @@ export function createAuth({ store, env = process.env, mailer = null, findRoomId
     const grid = /^\/grille\/([\w-]{1,40})$/.exec(value);
     const gridId = grid && (await store.getGrid(grid[1]))?.id;
     if (gridId) return `/grille/${gridId}`;
+    const seat = /^\/partie\/([\w-]{1,40})$/.exec(value);
+    const asyncGame = seat && (await store.getAsyncGame(seat[1]));
+    const seatLink = asyncGame?.seats.find((s) => s.link === seat[1])?.link;
+    if (seatLink) return `/partie/${seatLink}`;
     const room = /^\/salon\/([\w-]{1,40})$/.exec(value);
     const roomId = room && findRoomId(room[1]);
     if (roomId) return `/salon/${roomId}`;
@@ -433,5 +437,5 @@ export function createAuth({ store, env = process.env, mailer = null, findRoomId
     res.status(204).end();
   });
 
-  return { router, providers, currentUser };
+  return { router, providers, currentUser, baseUrl };
 }

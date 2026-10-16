@@ -100,6 +100,15 @@ test('une partie complète, du salon à la grille consultable', async () => {
   assert.deepEqual(grid.body.bonus, [8]);
   assert.deepEqual(grid.body.players, ['Alice', 'Bob']);
   assert.equal(grid.body.rounds, 6);
+  assert.equal(grid.body.mode, undefined);
+  assert.deepEqual(grid.body.validatedRounds, [
+    { round: 1, phase: 'numbers', numbers: [3] },
+    { round: 2, phase: 'numbers', numbers: [14] },
+    { round: 3, phase: 'numbers', numbers: [15] },
+    { round: 4, phase: 'numbers', numbers: [26] },
+    { round: 5, phase: 'numbers', numbers: [49] },
+    { round: 6, phase: 'chance', numbers: [8] },
+  ]);
 
   const page = await fetch(`${baseUrl}/grille/${roomId}`);
   assert.equal(page.status, 200);

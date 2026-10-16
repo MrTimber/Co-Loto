@@ -55,10 +55,29 @@ Le jeu est choisi à la création du salon :
 - Quand le dernier numéro complémentaire est validé collectivement, **la partie est terminée** et la grille co-créée s'affiche.
 - Le fond de page reprend le dégradé de couleur du jeu choisi.
 
+### 4 bis. Partie à distance (asynchrone)
+
+À la création, le créateur choisit le mode de jeu : **en direct** (le salon et les tours décrits ci-dessus) ou **à distance**, quand les joueurs ne peuvent pas être présents en même temps.
+
+- Le créateur choisit le jeu, le **nombre exact de joueurs** (2 à 12, lui compris, 3 par défaut), le mode (classique ou éclair, voir plus bas) et, en option, la date du tirage. Une partie à distance est toujours privée.
+- Co-Loto crée **un lien unique par joueur**. Le créateur les retrouve sur la page de sa partie (son propre lien), pour les copier, les partager ou les envoyer par email, et pour relancer les retardataires.
+- En ouvrant son lien, chaque joueur choisit son pseudo, ou se connecte : le pseudo de son compte est alors utilisé.
+- Chaque joueur **classe des numéros par ordre de préférence**, puis les numéros complémentaires, en en classant au moins un minimum :
+  - **Mode classique** : assez de numéros pour que la grille soit complétée à coup sûr, quoi que choisissent les autres. Avec `n` joueurs et un jeu de `N` numéros dont `c` à trouver, chacun en classe au moins ⌈(c + (n − 1) × N) / n⌉. Au Loto : 27 numéros et 6 numéros chance à 2 joueurs, 35 et 7 à 3 joueurs, 46 et 10 à 12 joueurs.
+  - **Mode éclair** : deux fois le nombre à trouver (au Loto, 10 numéros et 2 numéros chance). Si la simulation ne remplit pas la grille, les places restantes vont aux numéros classés par le plus de joueurs, puis au meilleur rang moyen, puis au plus petit. La page de la grille signale ces numéros « complétés ».
+- Le joueur peut modifier son classement tant que tout le monde n'a pas répondu. Les classements des autres restent secrets : on voit seulement qui a répondu, et quand.
+- Quand le dernier joueur a répondu, **la partie est simulée tour par tour** : au tour k, chaque joueur joue le k-ième numéro de son classement, et un numéro est validé dès qu'il figure dans les k premiers de chacun. Les règles sont celles du direct (numéros validés en surnombre gardés, numéros complémentaires ensuite).
+- Chaque joueur connecté peut cocher « Recevoir la grille par email » (coché par défaut) : la grille lui est alors envoyée avec son lien, si son adresse email est vérifiée. Les joueurs connectés la retrouvent aussi dans « Mon espace ».
+- Si un joueur ne répond pas, le créateur peut le retirer dès que 2 joueurs ont répondu : la grille est calculée sans lui. Sans réponse de tous, la partie expire à la fin des prises de jeu du tirage prévu, ou au bout de 30 jours sans date de tirage.
+
+### Mes parties en cours
+
+L'entrée « Mes parties en cours » du menu liste le salon en direct où l'on joue sur cet appareil (pour y revenir après être allé sur une autre page, dans les 90 secondes) et les parties à distance : celles ouvertes sur cet appareil et, pour un joueur connecté, celles de son compte. Pour chaque partie à distance : le jeu, le mode, le nombre de joueurs, qui a répondu et quand, et la date limite.
+
 ### 5. Après la partie
 
 - Les joueurs jouent la grille co-créée comme ils le souhaitent : en point de vente, sur le site de la FDJ, chacun de leur côté, ou ensemble en partageant les gains.
-- La grille reste consultable **30 jours** après sa création grâce à l'**URL unique** de la partie (`/grille/...`), que l'on peut copier ou partager depuis l'écran de fin.
+- La grille reste consultable **30 jours** après sa création grâce à l'**URL unique** de la partie (`/grille/...`), que l'on peut copier ou partager depuis l'écran de fin. Elle indique à quel tour chaque numéro a été validé.
 - Un joueur connecté retrouve toutes ses grilles dans **« Mon espace »**, où il voit son adresse email, peut modifier son pseudo, accepter de recevoir les résultats par email, et supprimer son compte. Un joueur qui a joué sans compte se voit proposer, à la fin de la partie, de se connecter : la grille qu'il vient de co-créer est alors ajoutée à son espace.
 - Si une date de tirage a été indiquée, elle s'affiche sur la page de la grille. À terme, le résultat de la grille sera évalué à la publication des résultats officiels et affiché sur cette page, et les joueurs qui ont renseigné leur adresse email et donné leur accord le **recevront par email** (pas encore disponible, voir « Prochaines étapes »).
 
@@ -68,6 +87,8 @@ Le jeu est choisi à la création du salon :
 - [x] Invitation par lien privé (copie du lien, email, partage depuis le téléphone)
 - [x] Salle d'attente en temps réel
 - [x] Grille de jeu synchronisée en temps réel (ses choix et les numéros validés par tous)
+- [x] Partie à distance : un lien unique par joueur, mode classique ou éclair, partie simulée, grille envoyée par email
+- [x] Page « Mes parties en cours » : salon en direct de l'appareil et parties à distance
 - [x] Validation des numéros par consensus
 - [x] Numéros validés en surnombre : grille multiple ou grille simple, au choix
 - [x] Choix du numéro chance, des étoiles ou du numéro Dream
@@ -94,11 +115,11 @@ Le jeu est choisi à la création du salon :
 
   Prix d'une grille simple, sans option : 2,20 € au Loto, 2,50 € à l'Euromillions (My Million compris) et à EuroDreams. Co-Loto informe seulement : rien n'est parié sur le site.
 - Les choix des numéros complémentaires repartent de zéro : ils sont indépendants des numéros déjà choisis.
-- Un joueur qui ferme sa page peut revenir avec le même lien (son navigateur garde un jeton). S'il reste déconnecté plus de 90 secondes, il quitte la partie et le tour continue sans lui. Si le créateur part, le rôle passe au joueur suivant.
+- Un joueur qui ferme sa page peut revenir avec le même lien (son navigateur garde un jeton), ou depuis « Mes parties en cours ». S'il reste déconnecté plus de 90 secondes, il quitte la partie et le tour continue sans lui. Si le créateur part, le rôle passe au joueur suivant.
 
 ## Espace d'administration
 
-Réservé aux administrateurs, il est accessible depuis le menu burger de l'en-tête (présent pour tout le monde : « Accueil », « Mon espace » une fois connecté, puis « Se connecter » ou « Se déconnecter »). Pour tout autre visiteur, ses pages, ses scripts et son API n'existent pas (erreur 404) et le menu ne contient pas d'entrées d'administration.
+Réservé aux administrateurs, il est accessible depuis le menu burger de l'en-tête (présent pour tout le monde : « Accueil », « Mes parties en cours », « Mon espace » une fois connecté, puis « Se connecter » ou « Se déconnecter »). Pour tout autre visiteur, ses pages, ses scripts et son API n'existent pas (erreur 404) et le menu ne contient pas d'entrées d'administration.
 
 - **Superadmin** : il y en a un seul, désigné par la variable d'environnement `SUPERADMIN_EMAIL`. C'est le compte qui a cette adresse email (une adresse n'appartient qu'à un compte, voir « Comptes et adresses email »), **à condition qu'elle soit vérifiée**. Le compte n'a pas besoin d'exister à l'avance : il devient superadmin dès qu'il a cette adresse, vérifiée. Son rôle ne peut pas lui être retiré ; seul un changement de la variable désigne un autre superadmin.
 - **Administrateurs** : le superadmin nomme ou retire les administrateurs depuis la page « Utilisateurs ». Seul un compte dont l'adresse email est vérifiée peut être nommé, et un rôle n'est effectif qu'avec une adresse vérifiée.
@@ -136,6 +157,8 @@ Organisation du code :
 ```
 src/games.js      Description des jeux (numéros, jours de tirage, grilles multiples et prix), aussi servie au navigateur
 src/game.js       Règles du jeu (sans réseau, entièrement testées)
+src/async.js      Règles des parties à distance : classements et simulation (sans réseau, testées)
+src/asyncGames.js API des parties à distance (création, classement, retrait d'un joueur, parties en cours)
 src/app.js        Serveur HTTP, API et événements temps réel
 src/store.js      Stockage des grilles terminées (30 jours), des comptes et des sessions (Turso ou fichier SQLite)
 src/auth.js       Connexion Google, Microsoft, GitHub, Discord, Facebook (OAuth 2.0 avec openid-client) et API « Mon espace »
@@ -144,14 +167,14 @@ src/mail.js       Envoi des emails (SMTP) : codes de connexion, vérification d'
 src/stats.js      Mesure d'audience (pages vues, visiteurs du jour, appareils, sites d'origine)
 src/drawDate.js   Validation de la date de tirage
 src/index.js      Point d'entrée
-public/           Pages web (accueil, salon, grille, connexion, « Mon espace », confidentialité, page hors ligne)
+public/           Pages web (accueil, salon, partie à distance, « Mes parties en cours », grille, connexion, « Mon espace », confidentialité, page hors ligne)
 public/js/        Scripts des pages (modules JavaScript)
 public/sw.js      Service worker (installation, copie des fichiers statiques)
 admin/            Page et scripts de l'administration, servis seulement aux administrateurs
 test/             Tests automatisés
 ```
 
-Les salons en cours vivent en mémoire du serveur ; seules les grilles terminées sont enregistrées dans la base.
+Les salons en direct vivent en mémoire du serveur ; seules les grilles terminées sont enregistrées dans la base. Les parties à distance, qui durent plusieurs jours, y sont enregistrées dès leur création.
 
 ## Installation et lancement
 
@@ -297,7 +320,7 @@ Co-Loto demande à chaque service l'accès à l'adresse email, pour pouvoir envo
 
 #### Envoi des emails (SMTP)
 
-Les codes de connexion et les liens de vérification sont envoyés par un serveur SMTP, celui d'un service d'envoi d'emails (par exemple [Brevo](https://www.brevo.com/fr/), dont l'offre gratuite suffit, Mailjet ou Mailgun) ou de votre messagerie. Ajoutez dans Render :
+Les codes de connexion, les liens de vérification et les grilles des parties à distance sont envoyés par un serveur SMTP, celui d'un service d'envoi d'emails (par exemple [Brevo](https://www.brevo.com/fr/), dont l'offre gratuite suffit, Mailjet ou Mailgun) ou de votre messagerie. Ajoutez dans Render :
 
 | Variable | Rôle | Exemple |
 |---|---|---|

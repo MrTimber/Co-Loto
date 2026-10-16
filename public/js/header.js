@@ -1,6 +1,6 @@
 // En-tête : menu burger pour tout le monde, quelle que soit la taille de l'écran. Il commence par
-// « Accueil » et se termine par « Se connecter » (si la connexion est proposée) ou « Se déconnecter » ;
-// entre les deux, « Mon espace » et, pour un administrateur, les entrées de l'administration
+// « Accueil » et « Mes parties en cours », et se termine par « Se connecter » (si la connexion est
+// proposée) ou « Se déconnecter » ; entre les deux, « Mon espace » et, pour un administrateur, les entrées de l'administration
 // (chargées depuis l'espace d'administration).
 import { getAccount, claimStoredGrids, currentPath, logoutButton } from './account.js';
 import { el } from './common.js';
@@ -23,7 +23,7 @@ const { user, providers } = await getAccount();
 if (header) {
   const links = el('div', 'account-links');
   links.id = 'account-menu';
-  links.append(pageLink('/', 'Accueil'));
+  links.append(pageLink('/', 'Accueil'), pageLink('/mes-parties', 'Mes parties en cours'));
   if (user) links.append(pageLink('/mon-espace', 'Mon espace'));
   if (user?.admin) {
     try {

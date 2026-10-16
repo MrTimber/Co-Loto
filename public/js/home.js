@@ -1,17 +1,18 @@
-import { saveToken, formatDrawDate, escapeHtml, rulesFor, applyTheme, describeGame, NAME_KEY } from './common.js';
-import { GAMES, upcomingDrawDates } from './games.js';
+import { saveToken, formatDrawDate, escapeHtml, rulesFor, applyTheme, describeGame, countLabel, VARIANTS, NAME_KEY } from './common.js';
+import { GAMES, upcomingDrawDates, minRanking } from './games.js';
 
 const form = document.getElementById('create-form');
 const errorBox = document.getElementById('create-error');
 const select = form.elements.maxPlayers;
 
 for (let n = 2; n <= 12; n++) select.add(new Option(`${n} joueurs`, n, n === 12, n === 12));
+for (let n = 2; n <= 12; n++) form.elements.players.add(new Option(`${n} joueurs`, n, n === 3, n === 3));
 form.elements.name.value = localStorage.getItem(NAME_KEY) ?? '';
 
 // Le formulaire en cours de saisie est gardé pendant la session : revenir à l'accueil
 // (par le logo, par exemple) ne ramène pas au Loto et n'efface pas les choix déjà faits.
 const DRAFT_KEY = 'coloto:create-form';
-const DRAFT_FIELDS = ['name', 'gameType', 'maxPlayers', 'visibility', 'drawDate'];
+const DRAFT_FIELDS = ['mode', 'name', 'gameType', 'maxPlayers', 'players', 'variant', 'visibility', 'drawDate'];
 function loadDraft() {
   try {
     return JSON.parse(sessionStorage.getItem(DRAFT_KEY)) ?? {};
@@ -41,7 +42,39 @@ function restoreField(key, value) {
   }
 }
 const draft = loadDraft();
-for (const key of ['name', 'gameType', 'maxPlayers', 'visibility']) restoreField(key, draft[key]);
+for (const key of ['mode', 'name', 'gameType', 'maxPlayers', 'players', 'variant', 'visibility']) restoreField(key, draft[key]);
+
+// En direct, les joueurs se retrouvent dans un salon et jouent tour par tour. À distance, le créateur
+// envoie un lien unique à chaque joueur, qui classe ses numéros quand il veut : le pseudo est choisi
+// en ouvrant son lien, le nombre de joueurs est exact et la partie est toujours privée.
+const isAsync = () => form.elements.mode.value === 'async';
+function selectMode() {
+  const remote = isAsync();
+  document.getElementById('name-field').hidden = remote;
+  form.elements.name.required = !remote;
+  document.getElementById('max-players-field').hidden = remote;
+  document.getElementById('players-field').hidden = !remote;
+  document.getElementById('variant-field').hidden = !remote;
+  document.getElementById('visibility-field').hidden = remote;
+  document.getElementById('mode-hint').textContent = remote
+    ? 'Chaque joueur reçoit son propre lien et classe ses numéros par ordre de préférence. Quand tout le monde a répondu, la partie est simulée tour par tour.'
+    : 'Les joueurs se retrouvent dans un salon et choisissent un numéro à chaque tour.';
+  form.querySelector('button[type="submit"]').textContent = remote ? 'Créer la partie' : 'Ouvrir le salon';
+}
+form.elements.mode.forEach((radio) => radio.addEventListener('change', selectMode));
+selectMode();
+
+// Le nombre de numéros à classer dépend du jeu, du nombre de joueurs et du classement choisi.
+function describeVariants() {
+  const rules = rulesFor(form.elements.gameType.value);
+  const players = Number(form.elements.players.value);
+  for (const [key, variant] of Object.entries(VARIANTS)) {
+    const counts = rules.phases.map((phase) => countLabel(phase, minRanking(phase, players, key))).join(' et ');
+    form.querySelector(`[data-variant="${key}"]`).textContent = `${variant.name} : ${counts} à classer`;
+  }
+  document.getElementById('variant-hint').textContent = VARIANTS[form.elements.variant.value].hint;
+}
+form.addEventListener('change', describeVariants);
 
 const monthFormat = new Intl.DateTimeFormat('fr-FR', { month: 'long', year: 'numeric', timeZone: 'UTC' });
 
@@ -77,6 +110,7 @@ function selectGame() {
 form.elements.gameType.forEach((radio) => radio.addEventListener('change', selectGame));
 selectGame();
 restoreField('drawDate', draft.drawDate);
+describeVariants();
 form.addEventListener('input', saveDraft);
 form.addEventListener('change', saveDraft);
 
@@ -87,6 +121,24 @@ form.addEventListener('submit', async (event) => {
   data.maxPlayers = Number(data.maxPlayers);
   const button = form.querySelector('button');
   button.disabled = true;
+  if (isAsync()) {
+    try {
+      const res = await fetch('/api/parties', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ gameType: data.gameType, players: Number(data.players), variant: data.variant, drawDate: data.drawDate }),
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error);
+      // Le lien de sa place sert aussi à rattacher plus tard la grille à son compte.
+      saveToken(body.gameId, body.link);
+      location.href = `/partie/${body.link}`;
+    } catch (err) {
+      errorBox.textContent = err.message || 'Impossible de créer la partie.';
+      button.disabled = false;
+    }
+    return;
+  }
   try {
     const res = await fetch('/api/rooms', {
       method: 'POST',
