@@ -85,14 +85,18 @@ export function gridBalls(numbers, bonus) {
 }
 
 // Modes des parties à distance : classique (grille garantie) ou éclair (grille complétée au besoin).
+// `hint(counts)` : explication du mode, avec le nombre de numéros à classer
+// (« 10 numéros et 2 numéros chance »).
 export const VARIANTS = {
   full: {
     name: 'Mode classique',
-    hint: 'Chacun classe assez de numéros pour que la grille soit trouvée à coup sûr : un numéro n’y entre que si tout le monde l’a choisi. Plus long à remplir, mais la grille est un vrai consensus.',
+    hint: (counts) =>
+      `Chacun classe ${counts}, assez pour que la grille soit trouvée à coup sûr : un numéro n’y entre que si tout le monde l’a choisi. Plus long à remplir, mais la grille est un vrai consensus.`,
   },
   quick: {
     name: 'Mode éclair',
-    hint: 'Chacun ne classe que deux fois le nombre de numéros à trouver. Si les classements ne suffisent pas à remplir la grille, elle est complétée par les numéros choisis par le plus de joueurs, puis par les mieux classés.',
+    hint: (counts) =>
+      `Chacun ne classe que ${counts}. Si les classements ne suffisent pas à remplir la grille, elle est complétée par les numéros choisis par le plus de joueurs, puis par les mieux classés.`,
   },
 };
 

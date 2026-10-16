@@ -68,11 +68,12 @@ selectMode();
 function describeVariants() {
   const rules = rulesFor(form.elements.gameType.value);
   const players = Number(form.elements.players.value);
+  const counts = (key) => rules.phases.map((phase) => countLabel(phase, minRanking(phase, players, key))).join(' et ');
   for (const [key, variant] of Object.entries(VARIANTS)) {
-    const counts = rules.phases.map((phase) => countLabel(phase, minRanking(phase, players, key))).join(' et ');
-    form.querySelector(`[data-variant="${key}"]`).textContent = `${variant.name} : ${counts} à classer`;
+    form.querySelector(`[data-variant="${key}"]`).textContent = `${variant.name} : ${counts(key)} à classer`;
   }
-  document.getElementById('variant-hint').textContent = VARIANTS[form.elements.variant.value].hint;
+  const selected = form.elements.variant.value;
+  document.getElementById('variant-hint').textContent = VARIANTS[selected].hint(counts(selected));
 }
 form.addEventListener('change', describeVariants);
 
