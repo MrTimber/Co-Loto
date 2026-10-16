@@ -1,4 +1,4 @@
-import { saveToken, loadToken, forgetToken, escapeHtml, formatDrawDate, ball, rulesFor, applyTheme, countLabel, gridBalls, NAME_KEY } from './common.js';
+import { saveToken, prefersShareSheet, loadToken, forgetToken, escapeHtml, formatDrawDate, ball, rulesFor, applyTheme, countLabel, gridBalls, NAME_KEY } from './common.js';
 import { renderGridAccountOffer } from './account.js';
 import { renderPlayOptions } from './play-options.js';
 
@@ -98,7 +98,8 @@ $('copy-link').addEventListener('click', async () => {
     $('invite-link').select();
   }
 });
-if (navigator.share) {
+if (prefersShareSheet()) {
+  $('mail-link').hidden = true;
   $('share-link').hidden = false;
   $('share-link').addEventListener('click', () =>
     navigator.share({ title: 'Co-Loto', text: inviteText(rulesFor(state?.gameType)), url: inviteUrl }).catch(() => {}),

@@ -85,7 +85,7 @@ L'entrée « Mes parties en cours » du menu liste le salon en direct où l'on j
 ## Fonctionnalités
 
 - [x] Création de salon (public / privé, 2 à 12 joueurs) et liste des salons publics sur l'accueil
-- [x] Invitation par lien privé (copie du lien, email, partage depuis le téléphone)
+- [x] Invitation par lien privé (copie du lien ; sur smartphone et tablette, menu de partage du système : SMS, WhatsApp, email… ; sinon envoi par email)
 - [x] Salle d'attente en temps réel
 - [x] Grille de jeu synchronisée en temps réel (ses choix et les numéros validés par tous)
 - [x] Partie à distance : un lien unique par joueur, mode classique ou éclair, partie simulée, grille envoyée par email

@@ -1,7 +1,7 @@
 // Partie à distance : le joueur ouvre son lien unique, choisit son pseudo (ou utilise celui de
 // son compte) et classe ses numéros par ordre de préférence. Le créateur y trouve aussi les liens
 // à envoyer aux autres joueurs.
-import { saveToken, el, rulesFor, applyTheme, formatDrawDate, formatMoment, countLabel, seatItems, VARIANTS, NAME_KEY } from './common.js';
+import { saveToken, prefersShareSheet, el, rulesFor, applyTheme, formatDrawDate, formatMoment, countLabel, seatItems, VARIANTS, NAME_KEY } from './common.js';
 import { getAccount, providerButtons } from './account.js';
 
 const link = decodeURIComponent(location.pathname.split('/').pop());
@@ -83,14 +83,16 @@ function linkBox(url, label, { subject, text }) {
       input.select();
     }
   });
-  const mail = el('a', 'button small', 'Envoyer par email');
-  mail.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(`${text} : ${url}`)}`;
-  const actions = el('div', 'invite-actions', copy, mail);
-  if (navigator.share) {
+  const actions = el('div', 'invite-actions', copy);
+  if (prefersShareSheet()) {
     const share = el('button', 'small', 'Partager…');
     share.type = 'button';
     share.addEventListener('click', () => navigator.share({ title: 'Co-Loto', text, url }).catch(() => {}));
     actions.append(share);
+  } else {
+    const mail = el('a', 'button small', 'Envoyer par email');
+    mail.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(`${text} : ${url}`)}`;
+    actions.append(mail);
   }
   return { input, actions };
 }
