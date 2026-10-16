@@ -61,6 +61,7 @@ Le jeu est choisi à la création du salon :
 
 - Le créateur choisit le jeu, le **nombre exact de joueurs** (2 à 12, lui compris, 3 par défaut), le mode (classique ou éclair, voir plus bas) et, en option, la date du tirage. Une partie à distance est toujours privée.
 - Co-Loto crée **un lien unique par joueur**. Le créateur les retrouve sur la page de sa partie (son propre lien), pour les copier, les partager ou les envoyer par email, et pour relancer les retardataires.
+- Chaque joueur, créateur compris, voit aussi **son propre lien** en haut de sa page, à copier ou à s'envoyer par email : sans compte, c'est le seul moyen de retrouver la partie depuis un autre appareil.
 - En ouvrant son lien, chaque joueur choisit son pseudo, ou se connecte : le pseudo de son compte est alors utilisé.
 - Chaque joueur **classe des numéros par ordre de préférence**, puis les numéros complémentaires, en en classant au moins un minimum :
   - **Mode classique** : assez de numéros pour que la grille soit complétée à coup sûr, quoi que choisissent les autres. Avec `n` joueurs et un jeu de `N` numéros dont `c` à trouver, chacun en classe au moins ⌈(c + (n − 1) × N) / n⌉. Au Loto : 27 numéros et 6 numéros chance à 2 joueurs, 35 et 7 à 3 joueurs, 46 et 10 à 12 joueurs.
@@ -84,7 +85,7 @@ L'entrée « Mes parties en cours » du menu liste le salon en direct où l'on j
 ## Fonctionnalités
 
 - [x] Création de salon (public / privé, 2 à 12 joueurs) et liste des salons publics sur l'accueil
-- [x] Invitation par lien privé (copie du lien, email, partage depuis le téléphone)
+- [x] Invitation par lien privé (copie du lien ; sur smartphone et tablette, menu de partage du système : SMS, WhatsApp, email… ; sinon envoi par email)
 - [x] Salle d'attente en temps réel
 - [x] Grille de jeu synchronisée en temps réel (ses choix et les numéros validés par tous)
 - [x] Partie à distance : un lien unique par joueur, mode classique ou éclair, partie simulée, grille envoyée par email

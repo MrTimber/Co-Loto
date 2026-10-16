@@ -25,6 +25,11 @@ export function storedTokenIds() {
     .map((key) => key.slice(TOKEN_PREFIX.length));
 }
 
+// Sur smartphone et tablette, le menu de partage du système (SMS, WhatsApp, email…) remplace
+// le bouton « Envoyer par email ». Il fonctionne aussi dans le navigateur, pas seulement dans
+// l'application installée (il demande une connexion HTTPS).
+export const prefersShareSheet = () => Boolean(navigator.share) && matchMedia('(pointer: coarse)').matches;
+
 // Construction nœud par nœud : aucune donnée reçue n'est interprétée comme du HTML.
 export function el(tag, className, ...children) {
   const node = document.createElement(tag);

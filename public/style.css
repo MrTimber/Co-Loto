@@ -470,7 +470,10 @@ button.ball.toggle[aria-pressed=false] { opacity: .3; text-decoration: line-thro
   text-align: center;
 }
 .cell:not(.ranked) .rank { display: none; }
-.ranking-order { display: flex; flex-wrap: wrap; gap: .25rem 1.6rem; padding-left: 1.4rem; }
+.ranking-order { list-style: none; padding: 0; margin: .5rem 0 0; display: grid; gap: .3rem; }
+.ranking-order li { display: flex; align-items: center; gap: .6rem; }
+.ranking-order .rank-label { min-width: 2.2rem; text-align: right; color: var(--muted); }
+.ranking-order .ball { width: 1.8rem; height: 1.8rem; font-size: .8rem; }
 .mode-picker .inline { margin-bottom: .25rem; }
 .my-games { list-style: none; padding: 0; margin: 0 0 1rem; }
 .my-games > li { padding: .75rem 0; border-bottom: 1px solid var(--border); }
@@ -479,3 +482,6 @@ button.ball.toggle[aria-pressed=false] { opacity: .3; text-decoration: line-thro
 .validated-rounds { list-style: none; padding: 0; margin: .5rem 0 1rem; display: grid; gap: .35rem; }
 .validated-rounds li { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem; }
 .validated-rounds .ball { width: 1.8rem; height: 1.8rem; font-size: .8rem; }
+.my-link h2 { margin-top: 0; }
+.my-link input { margin: .35rem 0 .5rem; }
+.invite-actions :is(button, .button).small { font-size: .875rem; }
