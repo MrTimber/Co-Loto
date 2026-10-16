@@ -136,3 +136,39 @@ test('« Mes parties en cours » liste aussi le salon en direct de l’appareil'
   assert.equal(res.body[0].url, `/salon/${roomId}`);
   assert.equal(res.body[0].isHost, true);
 });
+
+test('un même appareil ou un même compte ne joue pas deux places d’une partie', async () => {
+  // Le créateur, sans compte : son appareil reçoit un cookie et joue la place 0.
+  const res = await fetch(`${baseUrl}/api/parties`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ players: 3 }) });
+  const device = res.headers.getSetCookie().find((c) => c.startsWith('coloto_appareil=')).split(';')[0];
+  const { link } = await res.json();
+  const links = (await api(`/api/parties/${link}`, { cookie: device })).body.seats.map((s) => s.link);
+  assert.equal((await api(`/api/parties/${link}`, { cookie: device })).body.me.otherSeat, false);
+  // Le lien d'un autre joueur, ouvert sur le même appareil, est signalé et refusé.
+  assert.equal((await api(`/api/parties/${links[1]}`, { cookie: device })).body.me.otherSeat, true);
+  const steal = await api(`/api/parties/${links[1]}/classement`, { method: 'PUT', cookie: device, body: { name: 'Faux', ranking: ranking('loto', 3, 1) } });
+  assert.equal(steal.status, 409);
+  assert.equal(steal.body.code, 'other_seat');
+  // Le créateur joue sa propre place ; un autre appareil joue la place 1.
+  assert.equal((await api(`/api/parties/${link}/classement`, { method: 'PUT', cookie: device, body: { name: 'Hôte', ranking: ranking('loto', 3) } })).status, 200);
+  assert.equal((await api(`/api/parties/${links[1]}/classement`, { method: 'PUT', body: { name: 'Bob', ranking: ranking('loto', 3, 1) } })).status, 200);
+  assert.equal((await api(`/api/parties/${links[1]}`)).body.me.otherSeat, false);
+
+  // Un compte connecté ne joue pas deux places, même depuis un autre appareil.
+  const carla = await login('Carla', 'carla@example.com');
+  const game = await api('/api/parties', { method: 'POST', body: { players: 2 }, cookie: carla });
+  const other = (await api(`/api/parties/${game.body.link}`, { cookie: carla })).body.seats[1].link;
+  assert.equal((await api(`/api/parties/${other}`, { cookie: carla })).body.me.otherSeat, true);
+  assert.equal((await api(`/api/parties/${other}/classement`, { method: 'PUT', cookie: carla, body: { ranking: ranking('loto', 2) } })).body.code, 'other_seat');
+});
+
+test('un compte ne rattache qu’une place d’une même grille', async () => {
+  const store = await openStore();
+  await store.saveGrid({ id: 'g', numbers: [1, 2, 3, 4, 5], bonus: [6], players: ['A', 'B'], rounds: 5, participants: [{ token: 'ta', name: 'A' }, { token: 'tb', name: 'B' }] });
+  const user = await store.upsertUser({ provider: 'dev', providerId: 'u', name: 'U' });
+  assert.equal(await store.claimGrid(user.id, 'g', 'ta'), true);
+  assert.equal(await store.claimGrid(user.id, 'g', 'ta'), true); // la même place : sans effet
+  assert.equal(await store.claimGrid(user.id, 'g', 'tb'), false);
+  assert.equal((await store.listUserGrids(user.id)).length, 1);
+  store.close();
+});

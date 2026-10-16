@@ -61,6 +61,12 @@ function render() {
   renderInvitations(rules);
   if (state.me.removed) {
     $('ranking-form').replaceChildren(el('p', '', 'Le créateur vous a retiré de cette partie.'));
+  } else if (state.me.otherSeat && state.status === 'waiting') {
+    // Ce lien est celui d'un autre joueur : cet appareil (ou ce compte) joue déjà une autre place.
+    $('ranking-form').replaceChildren(
+      el('h2', '', 'Ce lien est celui d’un autre joueur'),
+      el('p', '', 'Vous jouez déjà une autre place de cette partie, sur cet appareil ou avec votre compte. Chaque joueur doit classer ses numéros avec son propre lien : transmettez celui-ci à la personne à qui il est destiné.'),
+    );
   } else if (state.status === 'expired') {
     $('ranking-form').replaceChildren(el('p', '', 'La date limite est passée avant que tout le monde ait répondu : la partie est terminée sans grille.'));
   } else {
@@ -101,7 +107,7 @@ function linkBox(url, label, { subject, text }) {
 // Son propre lien, pour revenir à la partie : sans compte, c'est le seul moyen de la retrouver
 // depuis un autre appareil (ou après avoir effacé les données du navigateur).
 function renderMyLink(rules) {
-  const show = state.status === 'waiting' && !state.me.removed;
+  const show = state.status === 'waiting' && !state.me.removed && !state.me.otherSeat;
   $('my-link').hidden = !show;
   if (!show) return;
   const { input, actions } = linkBox(`${location.origin}/partie/${encodeURIComponent(link)}`, 'Votre lien personnel', {

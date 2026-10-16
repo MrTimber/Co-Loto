@@ -82,6 +82,7 @@ function toAsyncSeat(row) {
     emailResult: Boolean(row.email_result),
     submittedAt: row.submitted_at === null ? null : Number(row.submitted_at),
     removed: Boolean(row.removed),
+    device: row.device ?? null,
   };
 }
 
@@ -337,6 +338,8 @@ export async function openStore({ url, authToken, file = ':memory:', superadminE
     ],
     'write',
   );
+  // Appareil qui joue chaque place (empreinte de son cookie) : un appareil ne joue qu'une place par partie.
+  if (!(await columnsOf('async_seats')).has('device')) await run('ALTER TABLE async_seats ADD COLUMN device TEXT');
   const userColumns = await columnsOf('users');
   if (!userColumns.has('is_admin')) await run('ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0');
   if (!userColumns.has('last_login_at')) await run('ALTER TABLE users ADD COLUMN last_login_at INTEGER');
@@ -483,7 +486,8 @@ export async function openStore({ url, authToken, file = ':memory:', superadminE
     // --- Parties à distance ---
 
     // `links` : identifiant du lien de chaque place, celle du créateur en premier.
-    async createAsyncGame({ id, gameType, variant = 'full', drawDate = null, deadline = null, links }, now = Date.now()) {
+    // `hostDevice` : empreinte de l'appareil du créateur, qui joue la place 0.
+    async createAsyncGame({ id, gameType, variant = 'full', drawDate = null, deadline = null, links, hostDevice = null }, now = Date.now()) {
       const expiresAt = now + GRID_LIFETIME_MS;
       await db.batch(
         [
@@ -491,7 +495,10 @@ export async function openStore({ url, authToken, file = ':memory:', superadminE
             sql: 'INSERT INTO async_games (id, created_at, expires_at, deadline, game_type, variant, draw_date) VALUES (?, ?, ?, ?, ?, ?, ?)',
             args: [id, now, expiresAt, Math.min(deadline ?? expiresAt, expiresAt), gameType, variant, drawDate],
           },
-          ...links.map((link, seat) => ({ sql: 'INSERT INTO async_seats (link, game_id, seat) VALUES (?, ?, ?)', args: [link, id, seat] })),
+          ...links.map((link, seat) => ({
+            sql: 'INSERT INTO async_seats (link, game_id, seat, device) VALUES (?, ?, ?, ?)',
+            args: [link, id, seat, seat === 0 ? hostDevice : null],
+          })),
         ],
         'write',
       );
@@ -508,11 +515,15 @@ export async function openStore({ url, authToken, file = ':memory:', superadminE
       return { game: toAsyncGame(row), seats: rows.map(toAsyncSeat) };
     },
     // Enregistre (ou remplace) le classement d'une place encore en jeu, tant que la partie attend.
-    async saveAsyncRanking(link, { name, userId = null, ranking, emailResult }, now = Date.now()) {
+    // `device` : empreinte de l'appareil qui joue cette place ; refusé si cet appareil ou ce compte
+    // joue déjà une autre place de la partie.
+    async saveAsyncRanking(link, { name, userId = null, ranking, emailResult, device = null }, now = Date.now()) {
       const result = await run(
-        `UPDATE async_seats SET name = ?, user_id = ?, ranking = ?, email_result = ?, submitted_at = ?
-        WHERE link = ? AND removed = 0 AND EXISTS (SELECT 1 FROM async_games WHERE id = async_seats.game_id AND status = 'waiting')`,
-        name, userId, JSON.stringify(ranking), emailResult ? 1 : 0, now, link,
+        `UPDATE async_seats SET name = ?, user_id = ?, ranking = ?, email_result = ?, submitted_at = ?, device = coalesce(?, device)
+        WHERE link = ? AND removed = 0 AND EXISTS (SELECT 1 FROM async_games WHERE id = async_seats.game_id AND status = 'waiting')
+          AND NOT EXISTS (SELECT 1 FROM async_seats other WHERE other.game_id = async_seats.game_id AND other.link <> async_seats.link
+            AND other.removed = 0 AND ((? IS NOT NULL AND other.device = ?) OR (? IS NOT NULL AND other.user_id = ?)))`,
+        name, userId, JSON.stringify(ranking), emailResult ? 1 : 0, now, device, link, device, device, userId, userId,
       );
       return changes(result) > 0;
     },
@@ -698,13 +709,17 @@ export async function openStore({ url, authToken, file = ':memory:', superadminE
       if (token) await run('DELETE FROM sessions WHERE token_hash = ?', hash(token));
     },
     // Rattache une grille au compte grâce au jeton de participation gardé par le navigateur.
+    // Un compte n'a qu'une place par grille : le jeton d'un autre joueur de la même grille
+    // (une personne qui aurait joué deux places) est refusé.
     async claimGrid(userId, gridId, playerToken, now = Date.now()) {
       if (typeof playerToken !== 'string' || typeof gridId !== 'string') return false;
       const result = await run(
         `UPDATE grid_players SET user_id = ?
         WHERE token_hash = ? AND grid_id = ? AND (user_id IS NULL OR user_id = ?)
-          AND EXISTS (SELECT 1 FROM grids WHERE grids.id = grid_players.grid_id AND grids.expires_at > ?)`,
-        userId, hash(playerToken), gridId, userId, now,
+          AND EXISTS (SELECT 1 FROM grids WHERE grids.id = grid_players.grid_id AND grids.expires_at > ?)
+          AND NOT EXISTS (SELECT 1 FROM grid_players other WHERE other.grid_id = grid_players.grid_id
+            AND other.user_id = ? AND other.token_hash <> grid_players.token_hash)`,
+        userId, hash(playerToken), gridId, userId, now, userId,
       );
       return changes(result) > 0;
     },
