@@ -1,15 +1,45 @@
 // Parties à distance (asynchrones) : API de création, de classement et de suivi.
 // Le créateur envoie un lien unique à chaque joueur ; chacun classe ses numéros quand il veut.
 // Quand tout le monde a répondu, la partie est simulée et la grille enregistrée.
-import { randomBytes } from 'node:crypto';
+import { randomBytes, createHash } from 'node:crypto';
 import express from 'express';
 import { GAMES, minRanking } from './games.js';
 import { GameError, MIN_PLAYERS, normalizeName } from './game.js';
 import { DEFAULT_ASYNC_PLAYERS, validatePlayerCount, validateGameType, validateVariant, validateRanking, simulate, parisTime } from './async.js';
 import { validateDrawDate } from './drawDate.js';
 import { asyncResultEmail } from './mail.js';
+import { parseCookies } from './auth.js';
 
 const newId = (bytes) => randomBytes(bytes).toString('base64url');
+
+// Cookie qui identifie l'appareil (un code tiré au sort, sans aucune donnée personnelle) : un même
+// appareil ne peut pas jouer deux places d'une partie à distance. Seule son empreinte est enregistrée.
+const DEVICE_COOKIE = 'coloto_appareil';
+const DEVICE_LIFETIME_MS = 400 * 86_400_000;
+const deviceHash = (token) => createHash('sha256').update(`appareil|${token}`).digest('base64url');
+
+function readDevice(req) {
+  const token = parseCookies(req.headers.cookie)[DEVICE_COOKIE];
+  return typeof token === 'string' && /^[\w-]{16,64}$/.test(token) ? token : null;
+}
+
+// Empreinte de l'appareil, en posant son cookie s'il n'en a pas encore.
+function deviceOf(req, res) {
+  let token = readDevice(req);
+  if (!token) {
+    token = newId(18);
+    res.cookie(DEVICE_COOKIE, token, { httpOnly: true, sameSite: 'lax', secure: req.secure, maxAge: DEVICE_LIFETIME_MS, path: '/' });
+  }
+  return deviceHash(token);
+}
+
+// Une autre place de la partie est-elle déjà jouée par cet appareil ou par ce compte ?
+function playsOtherSeat(seats, me, device, user) {
+  return activeSeats(seats).some((s) => s !== me && ((device && s.device === device) || (user && s.userId === user.id)));
+}
+
+const OTHER_SEAT_MESSAGE =
+  'Vous jouez déjà une autre place de cette partie (sur cet appareil ou avec votre compte) : chaque joueur doit utiliser son propre lien, une seule fois.';
 
 const activeSeats = (seats) => seats.filter((s) => !s.removed);
 const iso = (ms) => (ms === null ? null : new Date(ms).toISOString());
@@ -145,7 +175,7 @@ export function createAsyncGames({ store, mailer, currentUser, baseUrl }) {
       const id = newId(9);
       const links = Array.from({ length: count }, () => newId(12));
       const deadline = date ? parisTime(date, GAMES[gameType].betsCloseAt) : null;
-      await store.createAsyncGame({ id, gameType, variant, drawDate: date, deadline, links });
+      await store.createAsyncGame({ id, gameType, variant, drawDate: date, deadline, links, hostDevice: deviceOf(req, res) });
       const user = await currentUser(req);
       if (user) await store.claimAsyncSeat(links[0], user.id);
       store.countEvent('room_created', gameType).catch((err) => console.error('Statistiques indisponibles :', err.message));
@@ -161,7 +191,12 @@ export function createAsyncGames({ store, mailer, currentUser, baseUrl }) {
     try {
       // La place n'est rattachée à un compte qu'à l'envoi du classement : ouvrir le lien d'un autre
       // joueur (le créateur qui le vérifie, par exemple) ne la lui prend pas.
-      res.json(asyncView(await load(req.params.link), req.params.link));
+      const found = await load(req.params.link);
+      const view = asyncView(found, req.params.link);
+      const device = readDevice(req);
+      const me = found.seats.find((s) => s.link === req.params.link);
+      view.me.otherSeat = playsOtherSeat(found.seats, me, device && deviceHash(device), await currentUser(req));
+      res.json(view);
     } catch (err) {
       fail(res, err);
     }
@@ -178,10 +213,11 @@ export function createAsyncGames({ store, mailer, currentUser, baseUrl }) {
       const takenNames = others.filter((s) => s.submittedAt !== null).map((s) => s.name);
       const { name, ranking, emailResult } = req.body ?? {};
       const user = await currentUser(req);
+      const device = deviceOf(req, res);
+      if (playsOtherSeat(seats, me, device, user)) throw Object.assign(new GameError('other_seat', OTHER_SEAT_MESSAGE), { status: 409 });
       let userId = me.userId;
       let pseudo;
       if (user && (!me.userId || me.userId === user.id)) {
-        if (others.some((s) => s.userId === user.id)) throw new GameError('already_seated', 'Votre compte a déjà une place dans cette partie.');
         userId = user.id;
         pseudo = uniqueName(user.name, takenNames);
       } else {
@@ -193,7 +229,13 @@ export function createAsyncGames({ store, mailer, currentUser, baseUrl }) {
       const clean = validateRanking(game.gameType, ranking, activeSeats(seats).length, game.variant);
       // L'envoi du résultat demande un compte connecté dont l'adresse est vérifiée.
       const wantsEmail = emailResult === true && Boolean(user?.emailVerified) && userId === user?.id;
-      if (!(await store.saveAsyncRanking(me.link, { name: pseudo, userId, ranking: clean, emailResult: wantsEmail }))) {
+      if (!(await store.saveAsyncRanking(me.link, { name: pseudo, userId, ranking: clean, emailResult: wantsEmail, device }))) {
+        // Refusé par la base : la partie vient de se terminer, ou une autre place vient d'être jouée
+        // par cet appareil ou ce compte (deux envois simultanés).
+        const now = await load(req.params.link);
+        if (playsOtherSeat(now.seats, now.seats.find((s) => s.link === me.link), device, user)) {
+          throw Object.assign(new GameError('other_seat', OTHER_SEAT_MESSAGE), { status: 409 });
+        }
         throw Object.assign(new GameError('finished', 'La partie est terminée.'), { status: 409 });
       }
       const finished = await maybeFinish(me.link, req);
