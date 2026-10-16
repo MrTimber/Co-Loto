@@ -1,7 +1,7 @@
 // Partie à distance : le joueur ouvre son lien unique, choisit son pseudo (ou utilise celui de
 // son compte) et classe ses numéros par ordre de préférence. Le créateur y trouve aussi les liens
 // à envoyer aux autres joueurs.
-import { saveToken, el, rulesFor, applyTheme, formatDrawDate, formatMoment, countLabel, seatItems, NAME_KEY } from './common.js';
+import { saveToken, el, rulesFor, applyTheme, formatDrawDate, formatMoment, countLabel, seatItems, VARIANTS, NAME_KEY } from './common.js';
 import { getAccount, providerButtons } from './account.js';
 
 const link = decodeURIComponent(location.pathname.split('/').pop());
@@ -53,7 +53,8 @@ function render() {
   $('view-game').hidden = false;
   $('game-title').textContent = `Partie ${rules.ofName} à distance`;
   const draw = state.drawDate ? ` · tirage prévu le ${formatDrawDate(state.drawDate)}` : '';
-  $('game-info').textContent = `${state.players} joueurs${draw} · réponses attendues jusqu'au ${formatMoment(state.deadline)}`;
+  $('game-info').textContent = `${state.players} joueurs · ${VARIANTS[state.variant].name.toLowerCase()}${draw} · réponses attendues jusqu'au ${formatMoment(state.deadline)}`;
+  $('variant-hint').textContent = `${VARIANTS[state.variant].hint} Quand tout le monde a répondu, la partie est simulée tour par tour : à chaque tour, chacun joue le numéro suivant de son classement.`;
   $('seats').replaceChildren(...seatItems(state.seats, state.me.seat));
   renderInvitations(rules);
   if (state.me.removed) {

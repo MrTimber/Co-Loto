@@ -41,9 +41,16 @@ try {
       el('details', 'small', el('summary', '', 'Voir à quel tour chaque numéro a été validé'),
         el('ul', 'validated-rounds', ...body.validatedRounds.map((r) => {
           const phaseIndex = rules.phases.findIndex((p) => p.key === r.phase);
-          return el('li', '', `Tour ${r.round} : `, ...r.numbers.map((n) => el('span', `ball ${phaseIndex > 0 ? 'bonus' : 'validated'}`, String(n))));
+          const phase = rules.phases[phaseIndex];
+          const label = r.completed ? `${phase.many[0].toUpperCase()}${phase.many.slice(1)} complété${phase.feminine ? 'e' : ''}s : ` : `Tour ${r.round} : `;
+          return el('li', '', label, ...r.numbers.map((n) => el('span', `ball ${phaseIndex > 0 ? 'bonus' : 'validated'}`, String(n))));
         }))),
     );
+    // Classement rapide : numéros ajoutés parce que la simulation n'a pas rempli la grille.
+    const completed = body.validatedRounds.filter((r) => r.completed).flatMap((r) => r.numbers);
+    if (completed.length) {
+      card.append(el('p', 'small muted', `Les classements n'ont pas suffi à tout trouver ensemble : ${completed.join(', ')} ${completed.length > 1 ? 'ont été ajoutés' : 'a été ajouté'} parce que ${completed.length > 1 ? 'ce sont les numéros les mieux classés' : 'c’est le numéro le mieux classé'} par l'ensemble des joueurs.`));
+    }
   }
   if (body.drawDate) {
     card.append(el('p', '', `Tirage prévu : ${formatDrawDate(body.drawDate)}. La vérification des résultats arrivera dans une prochaine version.`));

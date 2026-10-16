@@ -70,3 +70,22 @@ test('parisTime donne l’instant d’une heure de Paris', () => {
   assert.equal(new Date(parisTime('2026-10-17', '20:15')).toISOString(), '2026-10-17T18:15:00.000Z'); // heure d'été
   assert.equal(new Date(parisTime('2026-12-19', '20:15')).toISOString(), '2026-12-19T19:15:00.000Z');
 });
+
+test('classement rapide : 2 fois le nombre à trouver, grille complétée par les mieux classés', () => {
+  const [numbers, chance] = GAMES.loto.phases;
+  assert.equal(minRanking(numbers, 12, 'quick'), 10);
+  assert.equal(minRanking(chance, 3, 'quick'), 2);
+  assert.equal(minRanking(GAMES.euromillions.phases[1], 3, 'quick'), 4);
+  const alice = { numbers: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], chance: [1, 2] };
+  const bob = { numbers: [1, 11, 12, 13, 14, 15, 16, 17, 18, 2], chance: [3, 4] };
+  assert.equal(simulate('loto', [alice, bob]), null);
+  const result = simulate('loto', [alice, bob], { complete: true });
+  // 1 et 2 validés ; puis, parmi les numéros classés par un seul joueur : 11 (2e de Bob),
+  // puis 3 et 12 (3es), à égalité devant 4 (4e d'Alice).
+  assert.deepEqual(result.validated.numbers, [1, 2, 3, 11, 12]);
+  assert.deepEqual(result.validatedRounds.at(-2), { round: null, phase: 'numbers', numbers: [3, 11, 12], completed: true });
+  // Numéro chance : aucun en commun, le mieux classé l'emporte (1 et 3 ex aequo : le plus petit).
+  assert.deepEqual(result.validated.chance, [1]);
+  throwsCode(() => validateRanking('loto', { numbers: [1, 2, 3], chance: [1, 2] }, 2, 'quick'), 'ranking_too_short');
+  assert.ok(validateRanking('loto', alice, 12, 'quick'));
+});

@@ -64,6 +64,7 @@ function toAsyncGame(row) {
     createdAt: Number(row.created_at),
     expiresAt: Number(row.expires_at),
     deadline: Number(row.deadline),
+    variant: row.variant,
     status: row.status,
   };
 }
@@ -270,7 +271,8 @@ export async function openStore({ url, authToken, file = ':memory:', superadminE
       'CREATE TABLE IF NOT EXISTS stats_salts (day TEXT PRIMARY KEY, salt TEXT NOT NULL)',
       // Parties à distance en cours : elles durent plusieurs jours, elles ne peuvent pas vivre en
       // mémoire comme les salons en direct. `deadline` : date limite pour répondre (fin des prises
-      // de jeu du tirage prévu, sinon `expires_at`). `status` : waiting, puis finished.
+      // de jeu du tirage prévu, sinon `expires_at`). `variant` : classement complet (full) ou
+      // rapide (quick). `status` : waiting, puis finished.
       `CREATE TABLE IF NOT EXISTS async_games (
         id TEXT PRIMARY KEY,
         created_at INTEGER NOT NULL,
@@ -278,6 +280,7 @@ export async function openStore({ url, authToken, file = ':memory:', superadminE
         deadline INTEGER NOT NULL,
         game_type TEXT NOT NULL,
         draw_date TEXT,
+        variant TEXT NOT NULL DEFAULT 'full',
         status TEXT NOT NULL DEFAULT 'waiting'
       )`,
       // Une place par joueur. `link` : identifiant du lien unique de la place (le lien est envoyé
@@ -405,13 +408,13 @@ export async function openStore({ url, authToken, file = ':memory:', superadminE
     // --- Parties à distance ---
 
     // `links` : identifiant du lien de chaque place, celle du créateur en premier.
-    async createAsyncGame({ id, gameType, drawDate = null, deadline = null, links }, now = Date.now()) {
+    async createAsyncGame({ id, gameType, variant = 'full', drawDate = null, deadline = null, links }, now = Date.now()) {
       const expiresAt = now + GRID_LIFETIME_MS;
       await db.batch(
         [
           {
-            sql: 'INSERT INTO async_games (id, created_at, expires_at, deadline, game_type, draw_date) VALUES (?, ?, ?, ?, ?, ?)',
-            args: [id, now, expiresAt, Math.min(deadline ?? expiresAt, expiresAt), gameType, drawDate],
+            sql: 'INSERT INTO async_games (id, created_at, expires_at, deadline, game_type, variant, draw_date) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            args: [id, now, expiresAt, Math.min(deadline ?? expiresAt, expiresAt), gameType, variant, drawDate],
           },
           ...links.map((link, seat) => ({ sql: 'INSERT INTO async_seats (link, game_id, seat) VALUES (?, ?, ?)', args: [link, id, seat] })),
         ],

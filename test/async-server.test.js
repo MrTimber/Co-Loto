@@ -46,6 +46,11 @@ test('création d’une partie à distance : validation', async () => {
   assert.equal((await api('/api/parties', { method: 'POST', body: { players: 13 } })).status, 400);
   assert.equal((await api('/api/parties', { method: 'POST', body: { gameType: 'keno' } })).status, 400);
   assert.equal((await api('/api/parties', { method: 'POST', body: { drawDate: '2020-01-01' } })).status, 400);
+  assert.equal((await api('/api/parties', { method: 'POST', body: { variant: 'autre' } })).status, 400);
+  const quick = await api('/api/parties', { method: 'POST', body: { variant: 'quick', gameType: 'eurodreams', players: 4 } });
+  const view = (await api(`/api/parties/${quick.body.link}`)).body;
+  assert.equal(view.variant, 'quick');
+  assert.deepEqual(view.minimums, { numbers: 12, dream: 2 });
   assert.equal((await api('/api/parties/inconnu')).status, 404);
 });
 

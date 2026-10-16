@@ -5,7 +5,7 @@ import { randomBytes } from 'node:crypto';
 import express from 'express';
 import { GAMES, minRanking } from './games.js';
 import { GameError, MIN_PLAYERS, normalizeName } from './game.js';
-import { DEFAULT_ASYNC_PLAYERS, validatePlayerCount, validateGameType, validateRanking, simulate, parisTime } from './async.js';
+import { DEFAULT_ASYNC_PLAYERS, validatePlayerCount, validateGameType, validateVariant, validateRanking, simulate, parisTime } from './async.js';
 import { validateDrawDate } from './drawDate.js';
 import { asyncResultEmail } from './mail.js';
 
@@ -30,12 +30,13 @@ export function asyncView({ game, seats }, link, now = Date.now()) {
   return {
     id: game.id,
     gameType: game.gameType,
+    variant: game.variant,
     drawDate: game.drawDate,
     createdAt: iso(game.createdAt),
     deadline: iso(game.deadline),
     status: statusOf(game, now),
     players,
-    minimums: Object.fromEntries(rules.phases.map((phase) => [phase.key, minRanking(phase, players)])),
+    minimums: Object.fromEntries(rules.phases.map((phase) => [phase.key, minRanking(phase, players, game.variant)])),
     me: {
       seat: me.seat,
       isHost,
@@ -93,7 +94,7 @@ export function createAsyncGames({ store, mailer, currentUser, baseUrl }) {
     const { game, seats } = await load(link);
     const active = activeSeats(seats);
     if (game.status !== 'waiting' || active.length < MIN_PLAYERS || active.some((s) => s.submittedAt === null)) return false;
-    const result = simulate(game.gameType, active.map((s) => s.ranking));
+    const result = simulate(game.gameType, active.map((s) => s.ranking), { complete: game.variant === 'quick' });
     if (!result || !(await store.finishAsyncGame(game.id))) return false;
     const rules = GAMES[game.gameType];
     const [main, extra] = rules.phases;
@@ -129,9 +130,10 @@ export function createAsyncGames({ store, mailer, currentUser, baseUrl }) {
   }
 
   router.post('/api/parties', async (req, res) => {
-    const { gameType = 'loto', players = DEFAULT_ASYNC_PLAYERS, drawDate } = req.body ?? {};
+    const { gameType = 'loto', players = DEFAULT_ASYNC_PLAYERS, variant = 'full', drawDate } = req.body ?? {};
     try {
       validateGameType(gameType);
+      validateVariant(variant);
       const count = validatePlayerCount(Number(players));
       let date;
       try {
@@ -142,7 +144,7 @@ export function createAsyncGames({ store, mailer, currentUser, baseUrl }) {
       const id = newId(9);
       const links = Array.from({ length: count }, () => newId(12));
       const deadline = date ? parisTime(date, GAMES[gameType].betsCloseAt) : null;
-      await store.createAsyncGame({ id, gameType, drawDate: date, deadline, links });
+      await store.createAsyncGame({ id, gameType, variant, drawDate: date, deadline, links });
       const user = await currentUser(req);
       if (user) await store.claimAsyncSeat(links[0], user.id);
       store.countEvent('room_created', gameType).catch((err) => console.error('Statistiques indisponibles :', err.message));
@@ -191,7 +193,7 @@ export function createAsyncGames({ store, mailer, currentUser, baseUrl }) {
           throw new GameError('name_taken', 'Ce pseudo est déjà utilisé dans cette partie.');
         }
       }
-      const clean = validateRanking(game.gameType, ranking, activeSeats(seats).length);
+      const clean = validateRanking(game.gameType, ranking, activeSeats(seats).length, game.variant);
       // L'envoi du résultat demande un compte connecté dont l'adresse est vérifiée.
       const wantsEmail = emailResult === true && Boolean(user?.emailVerified) && userId === user?.id;
       if (!(await store.saveAsyncRanking(me.link, { name: pseudo, userId, ranking: clean, emailResult: wantsEmail }))) {
@@ -240,11 +242,12 @@ export function createAsyncGames({ store, mailer, currentUser, baseUrl }) {
     }
     return found
       .map(({ game, link, seats }) => {
-        const { gameType, drawDate, createdAt, deadline, status, players, me, seats: places } = asyncView({ game, seats }, link, now);
+        const { gameType, variant, drawDate, createdAt, deadline, status, players, me, seats: places } = asyncView({ game, seats }, link, now);
         return {
           kind: 'async',
           url: `/partie/${link}`,
           gameType,
+          variant,
           drawDate,
           createdAt,
           deadline,

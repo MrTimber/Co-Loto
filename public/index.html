@@ -54,6 +54,12 @@
           <label id="players-field" hidden>Nombre de joueurs, vous compris
             <select name="players"></select>
           </label>
+          <fieldset id="variant-field" hidden>
+            <legend>Classement</legend>
+            <label class="inline"><input type="radio" name="variant" value="full" checked> <span data-variant="full"></span></label>
+            <label class="inline"><input type="radio" name="variant" value="quick"> <span data-variant="quick"></span></label>
+            <p class="muted small" id="variant-hint"></p>
+          </fieldset>
           <fieldset id="visibility-field">
             <legend>Accès</legend>
             <label class="inline"><input type="radio" name="visibility" value="private" checked> Privé, sur invitation par lien</label>

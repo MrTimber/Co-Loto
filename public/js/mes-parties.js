@@ -1,6 +1,6 @@
 // « Mes parties en cours » : les salons en direct où cet appareil joue encore, et les parties à
 // distance (celles ouvertes sur cet appareil et celles du compte connecté).
-import { storedTokenIds, loadToken, el, rulesFor, formatDrawDate, formatMoment, seatItems } from './common.js';
+import { storedTokenIds, loadToken, el, rulesFor, formatDrawDate, formatMoment, seatItems, VARIANTS } from './common.js';
 import { getAccount, providerButtons } from './account.js';
 
 const card = document.getElementById('my-games');
@@ -27,7 +27,7 @@ function asyncItem(game, rules) {
     el(
       'p',
       'small muted',
-      `Créée le ${formatMoment(game.createdAt)} · ${answered}/${game.players} joueurs ont répondu`,
+      `${VARIANTS[game.variant].name} · créée le ${formatMoment(game.createdAt)} · ${answered}/${game.players} joueurs ont répondu`,
       game.drawDate ? ` · tirage du ${formatDrawDate(game.drawDate)}` : '',
       ` · réponses jusqu'au ${formatMoment(game.deadline)}`,
     ),

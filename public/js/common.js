@@ -79,6 +79,12 @@ export function gridBalls(numbers, bonus) {
   return numbers.map((n) => ball(n, 'validated')).join('') + bonus.map((n) => ball(n, 'bonus')).join('');
 }
 
+// Classements des parties à distance : complet (grille garantie) ou rapide (grille complétée au besoin).
+export const VARIANTS = {
+  full: { name: 'Classement complet', hint: 'Chacun classe assez de numéros pour que la grille soit trouvée à coup sûr par tout le monde.' },
+  quick: { name: 'Classement rapide', hint: 'Chacun classe moins de numéros ; si la grille n’est pas remplie, elle est complétée par les numéros les mieux classés.' },
+};
+
 // « 16 octobre à 06:22 », pour une réponse à une partie à distance.
 export function formatMoment(value) {
   const date = new Date(value);
