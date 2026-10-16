@@ -157,14 +157,9 @@ export function createAsyncGames({ store, mailer, currentUser, baseUrl }) {
   router.get('/api/parties/:link', async (req, res) => {
     res.set('cache-control', 'no-store');
     try {
-      let found = await load(req.params.link);
-      // Un joueur connecté qui ouvre son lien retrouve la partie dans « Mon espace ».
-      const user = await currentUser(req);
-      const me = found.seats.find((s) => s.link === req.params.link);
-      if (user && !me.userId && !me.removed && found.game.status === 'waiting' && (await store.claimAsyncSeat(me.link, user.id))) {
-        found = await load(req.params.link);
-      }
-      res.json(asyncView(found, req.params.link));
+      // La place n'est rattachée à un compte qu'à l'envoi du classement : ouvrir le lien d'un autre
+      // joueur (le créateur qui le vérifie, par exemple) ne la lui prend pas.
+      res.json(asyncView(await load(req.params.link), req.params.link));
     } catch (err) {
       fail(res, err);
     }
