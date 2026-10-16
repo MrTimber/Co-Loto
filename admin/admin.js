@@ -1,6 +1,6 @@
 // Espace d'administration : tableau de bord, utilisateurs, fréquentation et numéros joués.
 // Tout est construit nœud par nœud : aucune donnée reçue n'est interprétée comme du HTML.
-import { el, formatDrawDate, formatDay, ballNodes } from '/js/common.js';
+import { el, formatDrawDate, formatDay, ballNodes, PLAY_MODES } from '/js/common.js';
 import { GAMES, todayInFrance } from '/js/games.js';
 import { ADMIN_PAGES } from './menu.js';
 
@@ -13,6 +13,9 @@ const decimal = new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 1 });
 const percent = new Intl.NumberFormat('fr-FR', { style: 'percent', maximumFractionDigits: 1 });
 const shortDate = (day) => new Date(`${day}T12:00:00Z`).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', timeZone: 'UTC' });
 const gameName = (id) => GAMES[id]?.name ?? id;
+const modeName = (id) => PLAY_MODES[id] ?? id;
+// Mode de jeu d'une grille : en direct, ou à distance en mode classique ou éclair.
+const gridMode = (grid) => (grid.mode === 'async' ? (grid.variant ?? 'full') : 'live');
 const addDays = (day, n) => new Date(Date.parse(`${day}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
 
 async function getJson(url, options) {
@@ -114,17 +117,22 @@ function rankList(rows, names = {}, empty = 'Aucune donnée sur cette période.'
 async function renderOverview() {
   const data = await getJson('/api/admin/apercu');
   const { live, visits, month, users } = data;
-  const conversion = month.roomsCreated ? `${percent.format(month.gamesFinished / month.roomsCreated)} des salons créés` : null;
+  const conversion = month.roomsCreated ? `${percent.format(month.gamesFinished / month.roomsCreated)} des parties créées` : null;
   view.replaceChildren(
     panel(
       'En ce moment',
       el(
         'div',
         'tiles',
-        tile('Salons en attente', number.format(live.rooms.lobby)),
-        tile('Parties en cours', number.format(live.rooms.playing)),
+        tile('Salons en attente', number.format(live.rooms.lobby), 'parties en direct'),
+        tile('Parties en direct en cours', number.format(live.rooms.playing)),
         tile('Joueurs dans les salons', number.format(live.players)),
         tile('Connexions temps réel', number.format(live.connections)),
+        tile(
+          'Parties à distance en attente',
+          number.format((data.waiting.full ?? 0) + (data.waiting.quick ?? 0)),
+          `${number.format(data.waiting.full ?? 0)} classique · ${number.format(data.waiting.quick ?? 0)} éclair`,
+        ),
       ),
       Object.keys(live.games).length
         ? el('p', 'small muted', 'Salons ouverts par jeu : ', Object.entries(live.games).map(([g, n]) => `${gameName(g)} ${n}`).join(', '))
@@ -146,7 +154,7 @@ async function renderOverview() {
       el(
         'div',
         'tiles',
-        tile('Salons créés', number.format(month.roomsCreated)),
+        tile('Parties créées', number.format(month.roomsCreated), 'en direct et à distance'),
         tile('Grilles co-créées', number.format(month.gamesFinished), conversion),
         tile('Nouveaux comptes', number.format(month.signups)),
         tile('Connexions', number.format(month.logins)),
@@ -190,6 +198,35 @@ async function renderOverview() {
         : el('p', 'muted small', 'Aucune grille co-créée pour l’instant.'),
       el('p', 'small muted', 'Les numéros des grilles sont gardés 3 ans pour les statistiques, sans les pseudos ni aucun lien vers les joueurs.'),
     ),
+    panel(
+      'Grilles par mode de jeu',
+      data.modes.length
+        ? el(
+            'table',
+            'data-table wide',
+            el('thead', '', el('tr', '', ...['Mode', 'Sur 30 jours', 'Sur 3 ans', 'Joueurs en moyenne', 'Tours en moyenne'].map((h) => el('th', '', h)))),
+            el(
+              'tbody',
+              '',
+              ...Object.keys(PLAY_MODES)
+                .map((mode) => data.modes.find((m) => m.mode === mode))
+                .filter(Boolean)
+                .map((m) =>
+                  el(
+                    'tr',
+                    '',
+                    el('td', '', modeName(m.mode)),
+                    el('td', '', number.format(m.recent)),
+                    el('td', '', number.format(m.total)),
+                    el('td', '', decimal.format(m.averagePlayers)),
+                    el('td', '', decimal.format(m.averageRounds)),
+                  ),
+                ),
+            ),
+          )
+        : el('p', 'muted small', 'Aucune grille co-créée pour l’instant.'),
+      el('p', 'small muted', 'Partie à distance : les tours sont ceux de la simulation ; en mode éclair, les numéros complétés ne comptent pas de tour.'),
+    ),
   );
 }
 
@@ -210,7 +247,7 @@ function userGrids(grids) {
       const link = el('a', '', `${gameName(grid.gameType)} du ${formatDay(grid.createdAt)}`);
       link.href = `/grille/${encodeURIComponent(grid.id)}`;
       const balls = el('span', 'summary', ...ballNodes(grid.numbers, grid.bonus));
-      const item = el('li', '', link, balls, el('span', 'small muted', `Pseudo : ${grid.playerName} · avec ${grid.players.join(', ')}`));
+      const item = el('li', '', link, balls, el('span', 'small muted', `${modeName(gridMode(grid))} · Pseudo : ${grid.playerName} · avec ${grid.players.join(', ')}`));
       item.dataset.game = grid.gameType;
       return item;
     }),
@@ -351,8 +388,10 @@ async function renderTraffic(days = 30) {
       panel('Pages les plus vues', rankList(data.pages, PAGE_NAMES)),
       panel('Sites d’origine', rankList(data.referrers, {}, 'Aucun visiteur venu d’un autre site sur cette période.')),
       panel('Appareils', rankList(data.devices, { mobile: 'Mobile', tablette: 'Tablette', ordinateur: 'Ordinateur' })),
-      panel('Salons créés par jeu', rankList(data.roomsCreated, games)),
+      panel('Parties créées par jeu', rankList(data.roomsCreated, games)),
+      panel('Parties créées par mode', rankList(data.roomModes, PLAY_MODES)),
       panel('Grilles co-créées par jeu', rankList(data.gamesFinished, games)),
+      panel('Grilles co-créées par mode', rankList(data.gridModes, PLAY_MODES)),
       panel('Nouveaux comptes', rankList(data.signups, PROVIDERS)),
       panel('Connexions', rankList(data.logins, PROVIDERS)),
     ),
@@ -400,11 +439,12 @@ function numberChart(rows, grids, phase, gameType, bonus) {
   return box;
 }
 
-const numbersState = { game: 'loto', mode: 'period', from: addDays(todayInFrance(), -29), to: todayInFrance(), draw: '' };
+const numbersState = { game: 'loto', play: '', mode: 'period', from: addDays(todayInFrance(), -29), to: todayInFrance(), draw: '' };
 
 async function renderNumbers() {
   const s = numbersState;
   const params = new URLSearchParams({ jeu: s.game });
+  if (s.play) params.set('mode', s.play);
   if (s.mode === 'draw' && s.draw) params.set('tirage', s.draw);
   else {
     params.set('du', s.from);
@@ -426,7 +466,13 @@ async function renderNumbers() {
     refresh();
   });
 
-  const filters = el('div', 'filters', el('label', '', 'Jeu', game), el('label', '', 'Grilles de', mode));
+  const play = selectOf([['', 'Tous les modes'], ...Object.entries(PLAY_MODES)], s.play);
+  play.addEventListener('change', () => {
+    s.play = play.value;
+    refresh();
+  });
+
+  const filters = el('div', 'filters', el('label', '', 'Jeu', game), el('label', '', 'Mode', play), el('label', '', 'Grilles de', mode));
   if (s.mode === 'draw') {
     const draw = selectOf(data.drawDates.map((d) => [d.date, `${formatDrawDate(d.date)} (${d.grids})`]), s.draw);
     if (!data.drawDates.length) draw.append(el('option', '', 'Aucune grille pour ce jeu'));
@@ -474,7 +520,7 @@ async function renderNumbers() {
   view.replaceChildren(
     filters,
     panel(
-      `${rules.name} : grilles ${scope}`,
+      `${rules.name}${data.mode ? ` ${modeName(data.mode).toLowerCase()}` : ''} : grilles ${scope}`,
       el(
         'div',
         'tiles',

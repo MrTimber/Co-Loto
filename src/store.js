@@ -51,8 +51,9 @@ function toGrid(row) {
     bonus: row.bonus ? JSON.parse(row.bonus) : [row.chance],
     players: JSON.parse(row.players),
     rounds: row.rounds,
-    // Partie à distance : chaque joueur a classé ses numéros, la partie a été simulée.
-    ...(row.mode === 'async' && { mode: 'async' }),
+    // Partie à distance : chaque joueur a classé ses numéros, la partie a été simulée,
+    // en mode classique (full) ou éclair (quick).
+    ...(row.mode === 'async' && { mode: 'async', variant: row.variant ?? 'full' }),
     // Tours où des numéros ont été validés (absents des grilles enregistrées avant leur ajout).
     ...(row.validated_rounds && { validatedRounds: JSON.parse(row.validated_rounds) }),
   };
@@ -143,11 +144,27 @@ function statsDrawDate(gameType, drawDate, createdAt) {
   return drawDate ?? nextDrawDate(getGame(gameType) ?? GAMES[DEFAULT_GAME], new Date(createdAt));
 }
 
-function gridStatsInsert({ gameType = DEFAULT_GAME, numbers, bonus, players, rounds, drawDate = null }, createdAt) {
+// Mode de jeu d'une grille dans les statistiques : en direct (live), ou à distance en mode
+// classique (full) ou éclair (quick).
+export const PLAY_MODES = ['live', 'full', 'quick'];
+const playMode = ({ mode, variant }) => (mode === 'async' ? (variant ?? 'full') : 'live');
+
+function gridStatsInsert({ gameType = DEFAULT_GAME, numbers, bonus, players, rounds, drawDate = null, mode = null, variant = null }, createdAt) {
   return {
-    sql: `INSERT INTO grid_stats (created_at, day, game_type, draw_date, stats_draw_date, numbers, bonus, players, rounds)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    args: [createdAt, dayOf(createdAt), gameType, drawDate, statsDrawDate(gameType, drawDate, createdAt), JSON.stringify(numbers), JSON.stringify(bonus), players.length, rounds],
+    sql: `INSERT INTO grid_stats (created_at, day, game_type, draw_date, stats_draw_date, numbers, bonus, players, rounds, mode)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    args: [
+      createdAt,
+      dayOf(createdAt),
+      gameType,
+      drawDate,
+      statsDrawDate(gameType, drawDate, createdAt),
+      JSON.stringify(numbers),
+      JSON.stringify(bonus),
+      players.length,
+      rounds,
+      playMode({ mode, variant }),
+    ],
   };
 }
 
@@ -186,6 +203,8 @@ export async function openStore({ url, authToken, file = ':memory:', superadminE
   // Parties à distance : `mode` = 'async', et les tours simulés où des numéros ont été validés.
   if (!columns.has('mode')) await run('ALTER TABLE grids ADD COLUMN mode TEXT');
   if (!columns.has('validated_rounds')) await run('ALTER TABLE grids ADD COLUMN validated_rounds TEXT');
+  const gridVariantAdded = !columns.has('variant');
+  if (gridVariantAdded) await run('ALTER TABLE grids ADD COLUMN variant TEXT');
   const loginsExisted = await tableExists('user_logins');
   const gridStatsExisted = await tableExists('grid_stats');
   // Comptes : pseudo et email (jamais le vrai nom). L'adresse email vient toujours d'un fournisseur
@@ -251,7 +270,8 @@ export async function openStore({ url, authToken, file = ':memory:', superadminE
         numbers TEXT NOT NULL,
         bonus TEXT NOT NULL,
         players INTEGER NOT NULL,
-        rounds INTEGER NOT NULL
+        rounds INTEGER NOT NULL,
+        mode TEXT NOT NULL DEFAULT 'live'
       )`,
       'CREATE INDEX IF NOT EXISTS grid_stats_day ON grid_stats (game_type, day)',
       // Compteurs quotidiens de fréquentation et d'activité (pages vues, visiteurs, salons créés…).
@@ -318,6 +338,42 @@ export async function openStore({ url, authToken, file = ':memory:', superadminE
   }
   // Tirage compté dans les statistiques, calculé pour les grilles enregistrées avant son ajout.
   const statsColumns = await columnsOf('grid_stats');
+  // Mode de jeu, ajouté après les premières parties à distance : leurs grilles sont retrouvées par
+  // leur instant de création, le mode classique ou éclair par leur partie, et les salons créés par
+  // mode sont reconstitués à partir des salons créés par jeu.
+  if (!statsColumns.has('mode')) {
+    await run("ALTER TABLE grid_stats ADD COLUMN mode TEXT NOT NULL DEFAULT 'live'");
+    await db.batch(
+      [
+        `UPDATE grid_stats SET mode = coalesce(
+          (SELECT async_games.variant FROM grids JOIN async_games ON async_games.id = grids.id
+            WHERE grids.mode = 'async' AND grids.created_at = grid_stats.created_at AND grids.game_type = grid_stats.game_type),
+          (SELECT 'full' FROM grids WHERE grids.mode = 'async' AND grids.created_at = grid_stats.created_at AND grids.game_type = grid_stats.game_type),
+          'live')`,
+      ],
+      'write',
+    );
+  }
+  if (gridVariantAdded) {
+    await run(`UPDATE grids SET variant = coalesce((SELECT variant FROM async_games WHERE async_games.id = grids.id), 'full') WHERE mode = 'async'`);
+  }
+  if (!(await first("SELECT 1 FROM stats_counters WHERE metric = 'room_mode' LIMIT 1"))) {
+    const { rows: created } = await run("SELECT day, SUM(count) AS count FROM stats_counters WHERE metric = 'room_created' GROUP BY day");
+    const { rows: remote } = await run('SELECT created_at, variant FROM async_games');
+    const byDay = new Map(created.map((r) => [r.day, { live: Number(r.count), full: 0, quick: 0 }]));
+    for (const r of remote) {
+      const day = byDay.get(dayOf(Number(r.created_at)));
+      if (!day || !(r.variant in day)) continue;
+      day[r.variant] += 1;
+      day.live -= 1;
+    }
+    const rows = [...byDay].flatMap(([day, counts]) =>
+      Object.entries(counts)
+        .filter(([, count]) => count > 0)
+        .map(([key, count]) => ({ sql: "INSERT INTO stats_counters (day, metric, key, count) VALUES (?, 'room_mode', ?, ?)", args: [day, key, count] })),
+    );
+    if (rows.length) await db.batch(rows, 'write');
+  }
   if (!statsColumns.has('stats_draw_date')) await run('ALTER TABLE grid_stats ADD COLUMN stats_draw_date TEXT');
   const { rows: undated } = await run('SELECT id, game_type, draw_date, created_at FROM grid_stats WHERE stats_draw_date IS NULL');
   if (undated.length) {
@@ -371,12 +427,13 @@ export async function openStore({ url, authToken, file = ':memory:', superadminE
     // `participants` : jeton et pseudo de chaque joueur, pour rattacher plus tard la grille à son compte.
     // `validatedRounds` : tours où des numéros ont été validés. Partie à distance : `mode` = 'async' ; ses participants connectés
     // (`userId`) retrouvent directement la grille dans leur espace.
-    async saveGrid({ id, gameType = DEFAULT_GAME, numbers, bonus, players, rounds, drawDate = null, participants = [], mode = null, validatedRounds = null }, now = Date.now()) {
+    // `variant` : mode classique (full) ou éclair (quick) d'une partie à distance.
+    async saveGrid({ id, gameType = DEFAULT_GAME, numbers, bonus, players, rounds, drawDate = null, participants = [], mode = null, variant = null, validatedRounds = null }, now = Date.now()) {
       await db.batch(
         [
           {
-            sql: `INSERT OR REPLACE INTO grids (id, created_at, expires_at, draw_date, game_type, numbers, bonus, chance, players, rounds, mode, validated_rounds)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            sql: `INSERT OR REPLACE INTO grids (id, created_at, expires_at, draw_date, game_type, numbers, bonus, chance, players, rounds, mode, variant, validated_rounds)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             args: [
               id,
               now,
@@ -389,10 +446,11 @@ export async function openStore({ url, authToken, file = ':memory:', superadminE
               JSON.stringify(players),
               rounds,
               mode,
+              mode === 'async' ? (variant ?? 'full') : null,
               validatedRounds && JSON.stringify(validatedRounds),
             ],
           },
-          gridStatsInsert({ gameType, numbers, bonus, players, rounds, drawDate }, now),
+          gridStatsInsert({ gameType, numbers, bonus, players, rounds, drawDate, mode, variant }, now),
           bump(dayOf(now), 'game_finished', gameType),
           ...participants.map(({ token, name, userId = null }) => ({
             sql: 'INSERT OR IGNORE INTO grid_players (token_hash, grid_id, name, user_id) VALUES (?, ?, ?, ?)',
@@ -705,10 +763,11 @@ export async function openStore({ url, authToken, file = ':memory:', superadminE
       return rows.map((r) => ({ day: r.day, metric: r.metric, key: r.key, count: Number(r.count) }));
     },
     // Numéros des grilles d'un jeu, créées du jour `from` au jour `to`, ou pour le tirage `drawDate`.
-    async gridStats({ gameType, from, to, drawDate }) {
+    // `mode` (facultatif) : seulement les grilles de ce mode de jeu.
+    async gridStats({ gameType, from, to, drawDate, mode = null }) {
       const { rows } = drawDate
-        ? await run('SELECT * FROM grid_stats WHERE game_type = ? AND stats_draw_date = ?', gameType, drawDate)
-        : await run('SELECT * FROM grid_stats WHERE game_type = ? AND day >= ? AND day <= ?', gameType, from, to);
+        ? await run('SELECT * FROM grid_stats WHERE game_type = ? AND stats_draw_date = ? AND (? IS NULL OR mode = ?)', gameType, drawDate, mode, mode)
+        : await run('SELECT * FROM grid_stats WHERE game_type = ? AND day >= ? AND day <= ? AND (? IS NULL OR mode = ?)', gameType, from, to, mode, mode);
       return rows.map((r) => ({
         day: r.day,
         drawDate: r.stats_draw_date,
@@ -716,19 +775,27 @@ export async function openStore({ url, authToken, file = ':memory:', superadminE
         bonus: JSON.parse(r.bonus),
         players: Number(r.players),
         rounds: Number(r.rounds),
+        mode: r.mode,
       }));
     },
+    // Grilles créées du jour `from` au jour `to`, par mode de jeu.
+    async gridModes(from, to) {
+      const { rows } = await run('SELECT mode, COUNT(*) AS total FROM grid_stats WHERE day >= ? AND day <= ? GROUP BY mode', from, to);
+      return rows.map((r) => ({ key: r.mode, count: Number(r.total) })).sort((a, b) => b.count - a.count || a.key.localeCompare(b.key));
+    },
     // Dates de tirage qui ont au moins une grille, la plus récente d'abord.
-    async statsDrawDates(gameType) {
+    async statsDrawDates(gameType, mode = null) {
       const { rows } = await run(
-        'SELECT stats_draw_date, COUNT(*) AS grids FROM grid_stats WHERE game_type = ? GROUP BY stats_draw_date ORDER BY stats_draw_date DESC',
+        'SELECT stats_draw_date, COUNT(*) AS grids FROM grid_stats WHERE game_type = ? AND (? IS NULL OR mode = ?) GROUP BY stats_draw_date ORDER BY stats_draw_date DESC',
         gameType,
+        mode,
+        mode,
       );
       return rows.map((r) => ({ date: r.stats_draw_date, grids: Number(r.grids) }));
     },
     async statsSummary(now = Date.now()) {
       const sinceDay = dayOf(now - 29 * 86_400_000);
-      const [users, grids, stats] = await db.batch(
+      const [users, grids, stats, modes, waiting] = await db.batch(
         [
           {
             sql: `SELECT COUNT(*) AS total, SUM(created_at > ?) AS recent, SUM(is_admin = 1 AND email_verified = 1) AS admins,
@@ -737,6 +804,8 @@ export async function openStore({ url, authToken, file = ':memory:', superadminE
           },
           { sql: 'SELECT COUNT(*) AS total FROM grids WHERE expires_at > ?', args: [now] },
           { sql: 'SELECT game_type, COUNT(*) AS total, SUM(day >= ?) AS recent, AVG(players) AS players, AVG(rounds) AS rounds FROM grid_stats GROUP BY game_type', args: [sinceDay] },
+          { sql: 'SELECT mode, COUNT(*) AS total, SUM(day >= ?) AS recent, AVG(players) AS players, AVG(rounds) AS rounds FROM grid_stats GROUP BY mode', args: [sinceDay] },
+          { sql: "SELECT variant, COUNT(*) AS total FROM async_games WHERE status = 'waiting' AND expires_at > ? GROUP BY variant", args: [now] },
         ],
         'read',
       );
@@ -751,6 +820,15 @@ export async function openStore({ url, authToken, file = ':memory:', superadminE
           averagePlayers: Number(r.players),
           averageRounds: Number(r.rounds),
         })),
+        modes: modes.rows.map((r) => ({
+          mode: r.mode,
+          total: Number(r.total),
+          recent: Number(r.recent ?? 0),
+          averagePlayers: Number(r.players),
+          averageRounds: Number(r.rounds),
+        })),
+        // Parties à distance qui attendent encore des classements, par mode.
+        waiting: Object.fromEntries(waiting.rows.map((r) => [r.variant, Number(r.total)])),
       };
     },
 

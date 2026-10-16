@@ -140,7 +140,7 @@ test('les numéros des grilles sont gardés 3 ans, sans les joueurs', async () =
   const day = dayOf(now);
   const loto = await store.gridStats({ gameType: 'loto', from: day, to: dayOf(now + 86_400_000) });
   assert.equal(loto.length, 2);
-  assert.deepEqual(loto[0], { day, drawDate: '2026-10-10', numbers: [1, 2, 3, 4, 5], bonus: [6], players: 2, rounds: 7 });
+  assert.deepEqual(loto[0], { day, drawDate: '2026-10-10', numbers: [1, 2, 3, 4, 5], bonus: [6], players: 2, rounds: 7, mode: 'live' });
   assert.equal((await store.gridStats({ gameType: 'loto', drawDate: '2026-10-12' })).length, 1);
   assert.deepEqual(await store.statsDrawDates('loto'), [{ date: '2026-10-12', grids: 1 }, { date: '2026-10-10', grids: 1 }]);
   // Sans date de tirage prévue : compté pour le prochain tirage au moment où la grille est terminée
@@ -167,6 +167,29 @@ test('les grilles déjà comptées reçoivent un tirage pour les statistiques', 
   old.close();
   const store = await openStore({ file });
   assert.deepEqual(await store.statsDrawDates('loto'), [{ date: '2026-10-12', grids: 1 }]); // tirage du samedi passé : lundi
+  store.close();
+});
+
+test('les statistiques d’avant les modes de jeu retrouvent le mode de chaque grille et partie', async () => {
+  const file = join(mkdtempSync(join(tmpdir(), 'coloto-')), 'modes.db');
+  const now = Date.UTC(2026, 9, 15, 10);
+  const first = await openStore({ file });
+  await first.createAsyncGame({ id: 'p1', gameType: 'loto', variant: 'quick', links: ['l1', 'l2'] }, now);
+  await first.countEvent('room_created', 'loto', now);
+  await first.countEvent('room_created', 'loto', now);
+  await first.saveGrid(grid('p1', [1, 2, 3, 4, 5], [6], { mode: 'async', variant: 'quick' }), now);
+  await first.saveGrid(grid('d1', [1, 2, 3, 4, 7], [6]), now + 1);
+  first.close();
+  // Base telle qu'elle était avant l'ajout des modes.
+  const old = new DatabaseSync(file);
+  old.exec("ALTER TABLE grid_stats DROP COLUMN mode; ALTER TABLE grids DROP COLUMN variant; DELETE FROM stats_counters WHERE metric = 'room_mode'");
+  old.close();
+  const store = await openStore({ file });
+  const day = dayOf(now);
+  assert.deepEqual(await store.gridModes(day, day), [{ key: 'live', count: 1 }, { key: 'quick', count: 1 }]);
+  assert.equal((await store.getGrid('p1', now)).variant, 'quick');
+  const rooms = (await store.counters(day, day)).filter((c) => c.metric === 'room_mode').map((c) => [c.key, c.count]).sort();
+  assert.deepEqual(rooms, [['live', 1], ['quick', 1]]);
   store.close();
 });
 
@@ -318,9 +341,22 @@ test('un admin consulte les grilles d’un joueur, la fréquentation et les num�
   assert.equal((await request('/api/admin/numeros?du=2026-02-01&au=2026-01-01', { cookie: boss })).status, 400);
   assert.equal((await request('/api/admin/numeros?tirage=demain', { cookie: boss })).status, 400);
 
+  // Modes de jeu : en direct, à distance classique, à distance éclair.
+  await store.saveGrid(grid('g2', [1, 2, 3, 4, 10], [6], { mode: 'async', variant: 'quick' }));
+  await store.claimGrid(lucie.id, 'g2', 't-g2');
+  const modes = await json(`/api/admin/utilisateurs/${lucie.id}/grilles`, { cookie: boss });
+  assert.deepEqual(modes.map((g) => [g.id, g.variant]).sort(), [['g1', undefined], ['g2', 'quick']]);
+  assert.equal((await json('/api/admin/numeros?jeu=loto&mode=quick', { cookie: boss })).grids, 1);
+  assert.equal((await json('/api/admin/numeros?jeu=loto&mode=live', { cookie: boss })).grids, 1);
+  assert.equal((await json('/api/admin/numeros?jeu=loto&mode=full', { cookie: boss })).grids, 0);
+  assert.equal((await json('/api/admin/numeros?jeu=loto&mode=autre', { cookie: boss })).grids, 2);
+  assert.deepEqual((await json('/api/admin/frequentation?jours=7', { cookie: boss })).gridModes, [{ key: 'live', count: 1 }, { key: 'quick', count: 1 }]);
+
   const overview = await json('/api/admin/apercu', { cookie: boss });
-  assert.equal(overview.month.gamesFinished, 1);
-  assert.equal(overview.activeGrids, 1);
+  assert.deepEqual(overview.modes.map((m) => [m.mode, m.total]).sort(), [['live', 1], ['quick', 1]]);
+  assert.deepEqual(overview.waiting, {});
+  assert.equal(overview.month.gamesFinished, 2);
+  assert.equal(overview.activeGrids, 2);
   assert.equal(typeof overview.live.connections, 'number');
 });
 

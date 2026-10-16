@@ -129,10 +129,12 @@ Pages :
 
 | Page | Contenu |
 |---|---|
-| `/admin` (tableau de bord) | Salons et joueurs en ce moment, visites, salons créés, grilles co-créées, comptes, grilles par jeu (joueurs et tours en moyenne) |
-| `/admin/utilisateurs` | Liste des comptes (pseudo, services de connexion liés, email, inscription, dernière connexion, rôle), recherche, grilles co-créées par chacun, nomination des administrateurs |
-| `/admin/frequentation` | Visiteurs et pages vues par jour (ou par semaine), grilles co-créées, pages les plus vues, sites d'origine, appareils, salons et grilles par jeu, inscriptions et connexions par fournisseur, sur 7 jours à 12 mois |
-| `/admin/numeros` | Numéros et numéros complémentaires les plus joués pour chaque jeu, sur une période d'un jour à un an, ou pour un tirage précis |
+| `/admin` (tableau de bord) | Salons et joueurs en ce moment, parties à distance en attente (classique et éclair), visites, parties créées, grilles co-créées, comptes, grilles par jeu et par mode de jeu (joueurs et tours en moyenne) |
+| `/admin/utilisateurs` | Liste des comptes (pseudo, services de connexion liés, email, inscription, dernière connexion, rôle), recherche, grilles co-créées par chacun (avec leur mode de jeu), nomination des administrateurs |
+| `/admin/frequentation` | Visiteurs et pages vues par jour (ou par semaine), grilles co-créées, pages les plus vues, sites d'origine, appareils, parties créées et grilles co-créées par jeu et par mode de jeu, inscriptions et connexions par fournisseur, sur 7 jours à 12 mois |
+| `/admin/numeros` | Numéros et numéros complémentaires les plus joués pour chaque jeu, pour tous les modes de jeu ou un seul, sur une période d'un jour à un an, ou pour un tirage précis |
+
+Les statistiques distinguent trois **modes de jeu** : *En direct* (salon tour par tour), *À distance, classique* et *À distance, éclair* (voir « Partie à distance »). Les grilles et les parties enregistrées avant l'ajout de cette distinction ont été reclassées automatiquement au démarrage.
 
 **Mesure d'audience sans outil externe.** Le serveur compte lui-même les pages ouvertes par un navigateur (les robots et le contrôle de santé de Render sont ignorés), par jour : page, type d'appareil, site d'origine. Un visiteur est compté une fois par jour grâce à une empreinte de son adresse IP et de son navigateur, mélangée à un sel tiré au sort chaque jour ; sels et empreintes sont effacés le lendemain. Aucun cookie, aucune adresse IP n'est enregistrée, et les visites d'un jour à l'autre ne peuvent pas être reliées.
 

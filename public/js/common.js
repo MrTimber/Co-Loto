@@ -96,6 +96,9 @@ export const VARIANTS = {
   },
 };
 
+// Modes de jeu, pour l'administration : en direct, ou à distance en mode classique ou éclair.
+export const PLAY_MODES = { live: 'En direct', full: 'À distance, classique', quick: 'À distance, éclair' };
+
 // « 16 octobre à 06:22 », pour une réponse à une partie à distance.
 export function formatMoment(value) {
   const date = new Date(value);
