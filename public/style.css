@@ -322,10 +322,10 @@ div.banner > .actions { margin: 0; }
   transform: translateY(-10%) rotate(45deg);
 }
 [data-game=eurodreams] .grid.bonus .cell:not(.picked) { --cell-text: var(--bonus); }
-[data-game=eurodreams] .grid.bonus .cell.validated { --cell-text: var(--bonus-text); }
+[data-game=eurodreams] .grid.bonus .cell:is(.validated, .ranked) { --cell-text: var(--bonus-text); }
 @media (prefers-color-scheme: dark) {
   [data-game=eurodreams] .grid.bonus .cell:not(.picked) { --cell-text: #f472b6; }
-  [data-game=eurodreams] .grid.bonus .cell.validated { --cell-text: var(--bonus-text); }
+  [data-game=eurodreams] .grid.bonus .cell:is(.validated, .ranked) { --cell-text: var(--bonus-text); }
 }
 
 .game-picker { display: grid; grid-template-columns: repeat(3, 1fr); gap: .5rem; }
