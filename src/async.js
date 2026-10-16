@@ -15,7 +15,7 @@ export function validatePlayerCount(players) {
 }
 
 export function validateVariant(variant) {
-  if (!RANKING_VARIANTS.includes(variant)) throw new GameError('invalid_variant', 'Choisissez le classement complet ou le classement rapide.');
+  if (!RANKING_VARIANTS.includes(variant)) throw new GameError('invalid_variant', 'Choisissez le mode classique ou le mode éclair.');
   return variant;
 }
 
@@ -51,7 +51,7 @@ export function validateRanking(gameType, ranking, players, variant = 'full') {
 // est validé dès qu'il figure dans les k premiers de tous les joueurs. Comme en direct, plusieurs
 // numéros validés au même tour sont tous gardés, et les numéros complémentaires suivent les numéros
 // (les tours continuent d'être comptés). Si les classements ne suffisent pas : avec `complete`
-// (classement rapide), les places restantes vont aux numéros classés par le plus de joueurs, puis
+// (mode éclair), les places restantes vont aux numéros classés par le plus de joueurs, puis
 // au meilleur rang moyen, puis au plus petit ; sinon la simulation renvoie null.
 export function simulate(gameType, rankings, { complete = false } = {}) {
   const rules = GAMES[gameType];

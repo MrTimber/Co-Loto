@@ -46,7 +46,7 @@ try {
           return el('li', '', label, ...r.numbers.map((n) => el('span', `ball ${phaseIndex > 0 ? 'bonus' : 'validated'}`, String(n))));
         }))),
     );
-    // Classement rapide : numéros ajoutés parce que la simulation n'a pas rempli la grille.
+    // Mode éclair : numéros ajoutés parce que la simulation n'a pas rempli la grille.
     const completed = body.validatedRounds.filter((r) => r.completed).flatMap((r) => r.numbers);
     if (completed.length) {
       card.append(el('p', 'small muted', `Les classements n'ont pas suffi à tout trouver ensemble : ${completed.join(', ')} ${completed.length > 1 ? 'ont été ajoutés' : 'a été ajouté'} parce que ${completed.length > 1 ? 'ce sont les numéros les mieux classés' : 'c’est le numéro le mieux classé'} par l'ensemble des joueurs.`));

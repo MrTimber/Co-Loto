@@ -59,12 +59,12 @@ Le jeu est choisi à la création du salon :
 
 À la création, le créateur choisit le mode de jeu : **en direct** (le salon et les tours décrits ci-dessus) ou **à distance**, quand les joueurs ne peuvent pas être présents en même temps.
 
-- Le créateur choisit le jeu, le **nombre exact de joueurs** (2 à 12, lui compris, 3 par défaut), le classement (complet ou rapide, voir plus bas) et, en option, la date du tirage. Une partie à distance est toujours privée.
+- Le créateur choisit le jeu, le **nombre exact de joueurs** (2 à 12, lui compris, 3 par défaut), le mode (classique ou éclair, voir plus bas) et, en option, la date du tirage. Une partie à distance est toujours privée.
 - Co-Loto crée **un lien unique par joueur**. Le créateur les retrouve sur la page de sa partie (son propre lien), pour les copier, les partager ou les envoyer par email, et pour relancer les retardataires.
 - En ouvrant son lien, chaque joueur choisit son pseudo, ou se connecte : le pseudo de son compte est alors utilisé.
 - Chaque joueur **classe des numéros par ordre de préférence**, puis les numéros complémentaires, en en classant au moins un minimum :
-  - **Classement complet** : assez de numéros pour que la grille soit complétée à coup sûr, quoi que choisissent les autres. Avec `n` joueurs et un jeu de `N` numéros dont `c` à trouver, chacun en classe au moins ⌈(c + (n − 1) × N) / n⌉. Au Loto : 27 numéros et 6 numéros chance à 2 joueurs, 35 et 7 à 3 joueurs, 46 et 10 à 12 joueurs.
-  - **Classement rapide** : deux fois le nombre à trouver (au Loto, 10 numéros et 2 numéros chance). Si la simulation ne remplit pas la grille, les places restantes vont aux numéros classés par le plus de joueurs, puis au meilleur rang moyen, puis au plus petit. La page de la grille signale ces numéros « complétés ».
+  - **Mode classique** : assez de numéros pour que la grille soit complétée à coup sûr, quoi que choisissent les autres. Avec `n` joueurs et un jeu de `N` numéros dont `c` à trouver, chacun en classe au moins ⌈(c + (n − 1) × N) / n⌉. Au Loto : 27 numéros et 6 numéros chance à 2 joueurs, 35 et 7 à 3 joueurs, 46 et 10 à 12 joueurs.
+  - **Mode éclair** : deux fois le nombre à trouver (au Loto, 10 numéros et 2 numéros chance). Si la simulation ne remplit pas la grille, les places restantes vont aux numéros classés par le plus de joueurs, puis au meilleur rang moyen, puis au plus petit. La page de la grille signale ces numéros « complétés ».
 - Le joueur peut modifier son classement tant que tout le monde n'a pas répondu. Les classements des autres restent secrets : on voit seulement qui a répondu, et quand.
 - Quand le dernier joueur a répondu, **la partie est simulée tour par tour** : au tour k, chaque joueur joue le k-ième numéro de son classement, et un numéro est validé dès qu'il figure dans les k premiers de chacun. Les règles sont celles du direct (numéros validés en surnombre gardés, numéros complémentaires ensuite). La page de la grille indique le tour simulé où chaque numéro a été validé.
 - Chaque joueur connecté peut cocher « Recevoir la grille par email » (coché par défaut) : la grille lui est alors envoyée avec son lien, si son adresse email est vérifiée. Les joueurs connectés la retrouvent aussi dans « Mon espace ».
@@ -72,7 +72,7 @@ Le jeu est choisi à la création du salon :
 
 ### Mes parties en cours
 
-L'entrée « Mes parties en cours » du menu liste le salon en direct où l'on joue sur cet appareil (pour y revenir après être allé sur une autre page, dans les 90 secondes) et les parties à distance : celles ouvertes sur cet appareil et, pour un joueur connecté, celles de son compte. Pour chaque partie à distance : le jeu, le classement, le nombre de joueurs, qui a répondu et quand, et la date limite.
+L'entrée « Mes parties en cours » du menu liste le salon en direct où l'on joue sur cet appareil (pour y revenir après être allé sur une autre page, dans les 90 secondes) et les parties à distance : celles ouvertes sur cet appareil et, pour un joueur connecté, celles de son compte. Pour chaque partie à distance : le jeu, le mode, le nombre de joueurs, qui a répondu et quand, et la date limite.
 
 ### 5. Après la partie
 
@@ -87,7 +87,7 @@ L'entrée « Mes parties en cours » du menu liste le salon en direct où l'on j
 - [x] Invitation par lien privé (copie du lien, email, partage depuis le téléphone)
 - [x] Salle d'attente en temps réel
 - [x] Grille de jeu synchronisée en temps réel (ses choix et les numéros validés par tous)
-- [x] Partie à distance : un lien unique par joueur, classement complet ou rapide, partie simulée, grille envoyée par email
+- [x] Partie à distance : un lien unique par joueur, mode classique ou éclair, partie simulée, grille envoyée par email
 - [x] Page « Mes parties en cours » : salon en direct de l'appareil et parties à distance
 - [x] Validation des numéros par consensus
 - [x] Numéros validés en surnombre : grille multiple ou grille simple, au choix

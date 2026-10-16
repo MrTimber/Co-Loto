@@ -271,8 +271,8 @@ export async function openStore({ url, authToken, file = ':memory:', superadminE
       'CREATE TABLE IF NOT EXISTS stats_salts (day TEXT PRIMARY KEY, salt TEXT NOT NULL)',
       // Parties à distance en cours : elles durent plusieurs jours, elles ne peuvent pas vivre en
       // mémoire comme les salons en direct. `deadline` : date limite pour répondre (fin des prises
-      // de jeu du tirage prévu, sinon `expires_at`). `variant` : classement complet (full) ou
-      // rapide (quick). `status` : waiting, puis finished.
+      // de jeu du tirage prévu, sinon `expires_at`). `variant` : mode classique (full) ou
+      // éclair (quick). `status` : waiting, puis finished.
       `CREATE TABLE IF NOT EXISTS async_games (
         id TEXT PRIMARY KEY,
         created_at INTEGER NOT NULL,
