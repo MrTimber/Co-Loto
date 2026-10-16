@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Co-Loto · Partie à distance</title>
+  <meta name="theme-color" content="#0f766e">
+  <meta name="robots" content="noindex">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icons/icon-192.png" type="image/png" sizes="192x192">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Co-Loto">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <script src="/js/splash.js"></script>
+  <header class="site-header">
+    <a class="logo" href="/"><img src="/img/logo.png" alt="Co-Loto" width="80" height="48"></a>
+    <span class="game-badge" id="header-badge" hidden></span>
+  </header>
+
+  <main class="container">
+    <section id="view-message" class="card narrow">
+      <p id="message-text" class="muted">Chargement de la partie…</p>
+      <p><a href="/" id="message-link" hidden>Retour à l'accueil</a></p>
+    </section>
+
+    <div id="view-game" class="async-game" hidden>
+      <section class="card">
+        <h1 id="game-title"></h1>
+        <p id="game-info" class="muted"></p>
+        <h2>Joueurs</h2>
+        <ul id="seats" class="players"></ul>
+      </section>
+
+      <section id="invitations" class="card" hidden>
+        <h2>Invitez les joueurs</h2>
+        <p class="small">Envoyez à chaque joueur <strong>son propre lien</strong> : il y choisit son pseudo (ou se connecte) et classe ses numéros quand il veut. Gardez le vôtre pour vous, c'est lui qui vous permet de suivre la partie.</p>
+        <ul id="invite-list" class="invite-list"></ul>
+        <p class="muted small" id="remove-hint"></p>
+        <p class="error" id="invite-error" role="alert"></p>
+      </section>
+
+      <form id="ranking-form" class="card">
+        <h2 id="ranking-title">Votre classement</h2>
+        <p id="ranking-status" class="banner" hidden></p>
+        <div id="identity"></div>
+        <div id="phases"></div>
+        <div id="email-option"></div>
+        <p class="error" id="ranking-error" role="alert"></p>
+        <button type="submit" class="primary" id="submit-ranking">Envoyer mon classement</button>
+      </form>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    co-loto.com est un site gratuit, sans aucune affiliation avec la Française des Jeux (<a href="https://www.fdj.fr/" rel="noopener">fdj.fr</a>).
+  </footer>
+  <script type="module" src="/js/partie.js"></script>
+  <script type="module" src="/js/header.js"></script>
+  <script type="module" src="/js/pwa.js"></script>
+</body>
+</html>

@@ -78,3 +78,27 @@ export function ballNodes(numbers, bonus) {
 export function gridBalls(numbers, bonus) {
   return numbers.map((n) => ball(n, 'validated')).join('') + bonus.map((n) => ball(n, 'bonus')).join('');
 }
+
+// « 16 octobre à 06:22 », pour une réponse à une partie à distance.
+export function formatMoment(value) {
+  const date = new Date(value);
+  return `${date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })} à ${date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`;
+}
+
+// Places d'une partie à distance : qui a répondu et quand (les classements restent secrets).
+export function seatItems(seats, mySeat) {
+  return seats
+    .filter((s) => !s.removed)
+    .map((s) => {
+      const who = s.name ? el('strong', '', s.name) : el('span', 'muted', s.seat === 0 ? 'Créateur' : `Joueur ${s.seat + 1}`);
+      const tags = [];
+      if (s.seat === 0) tags.push(el('span', 'tag', 'créateur'));
+      if (s.seat === mySeat) tags.push(el('span', 'tag', 'vous'));
+      const status = s.submittedAt
+        ? el('span', 'pick-status done', `a classé ses numéros le ${formatMoment(s.submittedAt)}`)
+        : el('span', 'pick-status', 'n’a pas encore répondu');
+      const item = el('li', '', who, ' ', ...tags.flatMap((t) => [t, ' ']), status);
+      item.dataset.seat = s.seat;
+      return item;
+    });
+}

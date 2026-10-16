@@ -63,6 +63,14 @@ export function findPhase(game, key) {
   return game.phases.find((p) => p.key === key) ?? null;
 }
 
+// Partie à distance : chaque joueur classe au moins ce nombre de numéros de la phase, par ordre
+// de préférence. Avec `players` classements de cette longueur, au moins `count` numéros sont
+// communs à tous : la partie simulée tour par tour se termine donc à coup sûr.
+export function minRanking(phase, players) {
+  const size = phase.max - phase.min + 1;
+  return Math.min(size, Math.ceil((phase.count + (players - 1) * size) / players));
+}
+
 function binomial(n, k) {
   let result = 1;
   for (let i = 1; i <= k; i++) result = (result * (n - k + i)) / i;

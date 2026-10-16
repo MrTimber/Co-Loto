@@ -31,8 +31,20 @@ try {
   card.replaceChildren(
     el('h1', '', `Votre grille ${rules.name}`),
     overflow ? options : el('div', 'summary big', ...ballNodes(body.numbers, body.bonus)),
-    el('p', '', 'Co-créée par ', ...listNames(body.players), ` en ${body.rounds} tours, le ${created}.`),
+    body.mode === 'async'
+      ? el('p', '', 'Co-créée à distance par ', ...listNames(body.players), ` le ${created} : chacun a classé ses numéros, et la partie a été simulée en ${body.rounds} tours.`)
+      : el('p', '', 'Co-créée par ', ...listNames(body.players), ` en ${body.rounds} tours, le ${created}.`),
   );
+  if (body.mode === 'async' && body.validatedRounds.length) {
+    // Tour simulé où chaque numéro a été validé.
+    card.append(
+      el('details', 'small', el('summary', '', 'Voir à quel tour chaque numéro a été validé'),
+        el('ul', 'validated-rounds', ...body.validatedRounds.map((r) => {
+          const phaseIndex = rules.phases.findIndex((p) => p.key === r.phase);
+          return el('li', '', `Tour ${r.round} : `, ...r.numbers.map((n) => el('span', `ball ${phaseIndex > 0 ? 'bonus' : 'validated'}`, String(n))));
+        }))),
+    );
+  }
   if (body.drawDate) {
     card.append(el('p', '', `Tirage prévu : ${formatDrawDate(body.drawDate)}. La vérification des résultats arrivera dans une prochaine version.`));
   }

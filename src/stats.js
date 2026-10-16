@@ -2,12 +2,14 @@
 // chaque page ouverte incrémente des compteurs quotidiens (page, type d'appareil, site d'origine).
 // Les visiteurs uniques sont comptés avec une empreinte qui change chaque jour (voir store.js).
 
-// Pages comptées, regroupées : tous les salons sous « /salon », toutes les grilles sous « /grille ».
+// Pages comptées, regroupées : tous les salons sous « /salon », toutes les parties à distance
+// sous « /partie », toutes les grilles sous « /grille ».
 const PAGES = new Map([
   ['/', '/'],
   ['/index.html', '/'],
   ['/connexion', '/connexion'],
   ['/mon-espace', '/mon-espace'],
+  ['/mes-parties', '/mes-parties'],
   ['/confidentialite', '/confidentialite'],
 ]);
 
@@ -16,7 +18,7 @@ const BOT = /bot|crawl|spider|slurp|facebookexternalhit|preview|monitor|curl|wge
 export function pagePath(pathname) {
   const known = PAGES.get(pathname);
   if (known) return known;
-  const match = /^\/(salon|grille)\/[\w-]{1,40}$/.exec(pathname);
+  const match = /^\/(salon|partie|grille)\/[\w-]{1,40}$/.exec(pathname);
   return match ? `/${match[1]}` : null;
 }
 

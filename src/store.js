@@ -51,6 +51,33 @@ function toGrid(row) {
     bonus: row.bonus ? JSON.parse(row.bonus) : [row.chance],
     players: JSON.parse(row.players),
     rounds: row.rounds,
+    // Partie à distance : chaque joueur a classé ses numéros, la partie a été simulée.
+    ...(row.mode === 'async' && { mode: 'async', validatedRounds: JSON.parse(row.validated_rounds ?? '[]') }),
+  };
+}
+
+function toAsyncGame(row) {
+  return {
+    id: row.id,
+    gameType: row.game_type,
+    drawDate: row.draw_date,
+    createdAt: Number(row.created_at),
+    expiresAt: Number(row.expires_at),
+    deadline: Number(row.deadline),
+    status: row.status,
+  };
+}
+
+function toAsyncSeat(row) {
+  return {
+    link: row.link,
+    seat: Number(row.seat),
+    name: row.name,
+    userId: row.user_id,
+    ranking: row.ranking ? JSON.parse(row.ranking) : null,
+    emailResult: Boolean(row.email_result),
+    submittedAt: row.submitted_at === null ? null : Number(row.submitted_at),
+    removed: Boolean(row.removed),
   };
 }
 
@@ -153,6 +180,9 @@ export async function openStore({ url, authToken, file = ':memory:', superadminE
   const columns = await columnsOf('grids');
   if (!columns.has('game_type')) await run("ALTER TABLE grids ADD COLUMN game_type TEXT NOT NULL DEFAULT 'loto'");
   if (!columns.has('bonus')) await run('ALTER TABLE grids ADD COLUMN bonus TEXT');
+  // Parties à distance : `mode` = 'async', et les tours simulés où des numéros ont été validés.
+  if (!columns.has('mode')) await run('ALTER TABLE grids ADD COLUMN mode TEXT');
+  if (!columns.has('validated_rounds')) await run('ALTER TABLE grids ADD COLUMN validated_rounds TEXT');
   const loginsExisted = await tableExists('user_logins');
   const gridStatsExisted = await tableExists('grid_stats');
   // Comptes : pseudo et email (jamais le vrai nom). L'adresse email vient toujours d'un fournisseur
@@ -238,6 +268,32 @@ export async function openStore({ url, authToken, file = ':memory:', superadminE
         PRIMARY KEY (day, hash)
       )`,
       'CREATE TABLE IF NOT EXISTS stats_salts (day TEXT PRIMARY KEY, salt TEXT NOT NULL)',
+      // Parties à distance en cours : elles durent plusieurs jours, elles ne peuvent pas vivre en
+      // mémoire comme les salons en direct. `deadline` : date limite pour répondre (fin des prises
+      // de jeu du tirage prévu, sinon `expires_at`). `status` : waiting, puis finished.
+      `CREATE TABLE IF NOT EXISTS async_games (
+        id TEXT PRIMARY KEY,
+        created_at INTEGER NOT NULL,
+        expires_at INTEGER NOT NULL,
+        deadline INTEGER NOT NULL,
+        game_type TEXT NOT NULL,
+        draw_date TEXT,
+        status TEXT NOT NULL DEFAULT 'waiting'
+      )`,
+      // Une place par joueur. `link` : identifiant du lien unique de la place (le lien est envoyé
+      // par le créateur, qui doit pouvoir le retrouver). `seat` 0 : le créateur.
+      `CREATE TABLE IF NOT EXISTS async_seats (
+        link TEXT PRIMARY KEY,
+        game_id TEXT NOT NULL,
+        seat INTEGER NOT NULL,
+        name TEXT,
+        user_id TEXT,
+        ranking TEXT,
+        email_result INTEGER NOT NULL DEFAULT 0,
+        submitted_at INTEGER,
+        removed INTEGER NOT NULL DEFAULT 0
+      )`,
+      'CREATE INDEX IF NOT EXISTS async_seats_game ON async_seats (game_id, seat)',
     ],
     'write',
   );
@@ -308,12 +364,14 @@ export async function openStore({ url, authToken, file = ':memory:', superadminE
   return {
     // `bonus` : numéros complémentaires (numéro chance, étoiles ou numéro Dream).
     // `participants` : jeton et pseudo de chaque joueur, pour rattacher plus tard la grille à son compte.
-    async saveGrid({ id, gameType = DEFAULT_GAME, numbers, bonus, players, rounds, drawDate = null, participants = [] }, now = Date.now()) {
+    // Partie à distance : `mode` = 'async' et `validatedRounds` ; ses participants connectés
+    // (`userId`) retrouvent directement la grille dans leur espace.
+    async saveGrid({ id, gameType = DEFAULT_GAME, numbers, bonus, players, rounds, drawDate = null, participants = [], mode = null, validatedRounds = null }, now = Date.now()) {
       await db.batch(
         [
           {
-            sql: `INSERT OR REPLACE INTO grids (id, created_at, expires_at, draw_date, game_type, numbers, bonus, chance, players, rounds)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            sql: `INSERT OR REPLACE INTO grids (id, created_at, expires_at, draw_date, game_type, numbers, bonus, chance, players, rounds, mode, validated_rounds)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             args: [
               id,
               now,
@@ -325,13 +383,15 @@ export async function openStore({ url, authToken, file = ':memory:', superadminE
               bonus[0], // ancienne colonne, conservée pour les bases existantes
               JSON.stringify(players),
               rounds,
+              mode,
+              validatedRounds && JSON.stringify(validatedRounds),
             ],
           },
           gridStatsInsert({ gameType, numbers, bonus, players, rounds, drawDate }, now),
           bump(dayOf(now), 'game_finished', gameType),
-          ...participants.map(({ token, name }) => ({
-            sql: 'INSERT OR IGNORE INTO grid_players (token_hash, grid_id, name) VALUES (?, ?, ?)',
-            args: [hash(token), id, name],
+          ...participants.map(({ token, name, userId = null }) => ({
+            sql: 'INSERT OR IGNORE INTO grid_players (token_hash, grid_id, name, user_id) VALUES (?, ?, ?, ?)',
+            args: [hash(token), id, name, userId],
           })),
         ],
         'write',
@@ -341,6 +401,81 @@ export async function openStore({ url, authToken, file = ':memory:', superadminE
       const row = await first('SELECT * FROM grids WHERE id = ? AND expires_at > ?', id, now);
       return row ? toGrid(row) : null;
     },
+
+    // --- Parties à distance ---
+
+    // `links` : identifiant du lien de chaque place, celle du créateur en premier.
+    async createAsyncGame({ id, gameType, drawDate = null, deadline = null, links }, now = Date.now()) {
+      const expiresAt = now + GRID_LIFETIME_MS;
+      await db.batch(
+        [
+          {
+            sql: 'INSERT INTO async_games (id, created_at, expires_at, deadline, game_type, draw_date) VALUES (?, ?, ?, ?, ?, ?)',
+            args: [id, now, expiresAt, Math.min(deadline ?? expiresAt, expiresAt), gameType, drawDate],
+          },
+          ...links.map((link, seat) => ({ sql: 'INSERT INTO async_seats (link, game_id, seat) VALUES (?, ?, ?)', args: [link, id, seat] })),
+        ],
+        'write',
+      );
+    },
+    // La partie d'une place et toutes ses places, ou null (lien inconnu ou partie expirée).
+    async getAsyncGame(link, now = Date.now()) {
+      if (typeof link !== 'string') return null;
+      const row = await first(
+        'SELECT async_games.* FROM async_seats JOIN async_games ON async_games.id = async_seats.game_id WHERE async_seats.link = ? AND async_games.expires_at > ?',
+        link, now,
+      );
+      if (!row) return null;
+      const { rows } = await run('SELECT * FROM async_seats WHERE game_id = ? ORDER BY seat', row.id);
+      return { game: toAsyncGame(row), seats: rows.map(toAsyncSeat) };
+    },
+    // Enregistre (ou remplace) le classement d'une place encore en jeu, tant que la partie attend.
+    async saveAsyncRanking(link, { name, userId = null, ranking, emailResult }, now = Date.now()) {
+      const result = await run(
+        `UPDATE async_seats SET name = ?, user_id = ?, ranking = ?, email_result = ?, submitted_at = ?
+        WHERE link = ? AND removed = 0 AND EXISTS (SELECT 1 FROM async_games WHERE id = async_seats.game_id AND status = 'waiting')`,
+        name, userId, JSON.stringify(ranking), emailResult ? 1 : 0, now, link,
+      );
+      return changes(result) > 0;
+    },
+    // Retire une place qui n'a pas encore répondu.
+    async removeAsyncSeat(gameId, seat) {
+      const result = await run(
+        `UPDATE async_seats SET removed = 1 WHERE game_id = ? AND seat = ? AND submitted_at IS NULL AND removed = 0
+          AND EXISTS (SELECT 1 FROM async_games WHERE id = ? AND status = 'waiting')`,
+        gameId, seat, gameId,
+      );
+      return changes(result) > 0;
+    },
+    // Rattache une place au compte qui ouvre son lien, sauf si ce compte a déjà une place dans la partie.
+    async claimAsyncSeat(link, userId) {
+      const result = await run(
+        `UPDATE async_seats SET user_id = ? WHERE link = ? AND user_id IS NULL AND removed = 0
+          AND NOT EXISTS (SELECT 1 FROM async_seats other WHERE other.game_id = async_seats.game_id AND other.user_id = ?)`,
+        userId, link, userId,
+      );
+      return changes(result) > 0;
+    },
+    // Parties à distance en cours d'un compte, la plus récente d'abord, avec toutes leurs places.
+    async listUserAsyncGames(userId, now = Date.now()) {
+      const { rows } = await run(
+        `SELECT async_games.*, async_seats.link AS my_link FROM async_seats JOIN async_games ON async_games.id = async_seats.game_id
+        WHERE async_seats.user_id = ? AND async_seats.removed = 0 AND async_games.status = 'waiting' AND async_games.expires_at > ?
+        ORDER BY async_games.created_at DESC`,
+        userId, now,
+      );
+      return Promise.all(
+        rows.map(async (row) => {
+          const seats = (await run('SELECT * FROM async_seats WHERE game_id = ? ORDER BY seat', row.id)).rows.map(toAsyncSeat);
+          return { game: toAsyncGame(row), link: row.my_link, seats };
+        }),
+      );
+    },
+    // Termine la partie : un seul appel réussit, même si deux joueurs répondent en même temps.
+    async finishAsyncGame(gameId) {
+      return changes(await run("UPDATE async_games SET status = 'finished' WHERE id = ? AND status = 'waiting'", gameId)) > 0;
+    },
+
     // Connexion avec un fournisseur.
     // 1. Fournisseur déjà lié à un compte : ce compte.
     // 2. Un compte a déjà cette adresse : si le fournisseur ne l'a pas vérifiée, renvoie
@@ -510,6 +645,7 @@ export async function openStore({ url, authToken, file = ':memory:', superadminE
       await db.batch(
         [
           { sql: 'UPDATE grid_players SET user_id = NULL WHERE user_id = ?', args: [userId] },
+          { sql: 'UPDATE async_seats SET user_id = NULL, email_result = 0 WHERE user_id = ?', args: [userId] },
           { sql: 'DELETE FROM sessions WHERE user_id = ?', args: [userId] },
           { sql: 'DELETE FROM user_logins WHERE user_id = ?', args: [userId] },
           { sql: 'DELETE FROM email_tokens WHERE user_id = ?', args: [userId] },
@@ -524,6 +660,8 @@ export async function openStore({ url, authToken, file = ':memory:', superadminE
         [
           { sql: 'DELETE FROM grids WHERE expires_at <= ?', args: [now] },
           'DELETE FROM grid_players WHERE grid_id NOT IN (SELECT id FROM grids)',
+          { sql: 'DELETE FROM async_games WHERE expires_at <= ?', args: [now] },
+          'DELETE FROM async_seats WHERE game_id NOT IN (SELECT id FROM async_games)',
           { sql: 'DELETE FROM sessions WHERE expires_at <= ?', args: [now] },
           { sql: 'DELETE FROM email_tokens WHERE expires_at <= ?', args: [now] },
           { sql: 'DELETE FROM grid_stats WHERE created_at <= ?', args: [now - STATS_LIFETIME_MS] },

@@ -437,3 +437,45 @@ button.ball.toggle { padding: 0; border: 0; line-height: 1; }
 button.ball.toggle[aria-pressed=false] { opacity: .3; text-decoration: line-through; }
 .play-status { font-weight: 600; }
 .play-status.warn { background: var(--pending-soft); border-radius: var(--radius); padding: .5rem .75rem; }
+
+/* Partie à distance : classement des numéros par ordre de préférence. */
+.async-game { max-width: 640px; margin: 0 auto; display: grid; gap: 1rem; }
+.async-game .card { margin: 0; }
+.invite-list { list-style: none; padding: 0; margin: 0 0 .5rem; }
+.invite-list li { padding: .75rem 0; border-bottom: 1px solid var(--border); }
+.invite-list input { margin: .35rem 0 .5rem; }
+.invite-title { margin: 0; }
+.ranking-phase { margin: 1rem 0 1.25rem; }
+.ranking-phase h3 { margin: 0 0 .25rem; }
+.ranking-phase p { margin: 0 0 .35rem; }
+.ranking-phase .grid { margin: .6rem 0 .75rem; }
+.ranking-count { font-weight: 600; color: var(--muted); }
+.ranking-count.done { color: var(--accent); }
+.cell.ranked { --cell-bg: var(--accent); --cell-line: var(--accent); --cell-text: var(--accent-text); }
+.game-grid.bonus .cell.ranked { --cell-bg: var(--bonus); --cell-line: var(--bonus); --cell-text: var(--bonus-text); }
+/* Rang du numéro, en petit au-dessus de la case (un élément à part : les étoiles et les gouttes
+   des numéros complémentaires utilisent déjà les pseudo-éléments de la case). */
+.cell .rank {
+  position: absolute;
+  top: -.35rem;
+  right: -.35rem;
+  z-index: 1;
+  min-width: 1.1rem;
+  padding: 0 .2rem;
+  border-radius: 99px;
+  background: var(--pending);
+  color: #1d2433;
+  font-size: .62rem;
+  line-height: 1.1rem;
+  text-align: center;
+}
+.cell:not(.ranked) .rank { display: none; }
+.ranking-order { display: flex; flex-wrap: wrap; gap: .25rem 1.6rem; padding-left: 1.4rem; }
+.mode-picker .inline { margin-bottom: .25rem; }
+.my-games { list-style: none; padding: 0; margin: 0 0 1rem; }
+.my-games > li { padding: .75rem 0; border-bottom: 1px solid var(--border); }
+.my-games .players { margin: .35rem 0 0; }
+.my-games .players li { padding: .2rem 0; border: 0; }
+.validated-rounds { list-style: none; padding: 0; margin: .5rem 0 1rem; display: grid; gap: .35rem; }
+.validated-rounds li { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem; }
+.validated-rounds .ball { width: 1.8rem; height: 1.8rem; font-size: .8rem; }
