@@ -54,7 +54,8 @@ function render() {
   $('game-title').textContent = `Partie ${rules.ofName} à distance`;
   const draw = state.drawDate ? ` · tirage prévu le ${formatDrawDate(state.drawDate)}` : '';
   $('game-info').textContent = `${state.players} joueurs · ${VARIANTS[state.variant].name.toLowerCase()}${draw} · réponses attendues jusqu'au ${formatMoment(state.deadline)}`;
-  $('variant-hint').textContent = `${VARIANTS[state.variant].hint} Quand tout le monde a répondu, la partie est simulée tour par tour : à chaque tour, chacun joue le numéro suivant de son classement.`;
+  const counts = rules.phases.map((phase) => countLabel(phase, state.minimums[phase.key])).join(' et ');
+  $('variant-hint').textContent = `${VARIANTS[state.variant].hint(counts)} Quand tout le monde a répondu, la partie est simulée tour par tour : à chaque tour, chacun joue le numéro suivant de son classement.`;
   $('seats').replaceChildren(...seatItems(state.seats, state.me.seat));
   renderMyLink(rules);
   renderInvitations(rules);
