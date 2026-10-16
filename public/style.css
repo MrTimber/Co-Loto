@@ -479,3 +479,6 @@ button.ball.toggle[aria-pressed=false] { opacity: .3; text-decoration: line-thro
 .validated-rounds { list-style: none; padding: 0; margin: .5rem 0 1rem; display: grid; gap: .35rem; }
 .validated-rounds li { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem; }
 .validated-rounds .ball { width: 1.8rem; height: 1.8rem; font-size: .8rem; }
+.my-link h2 { margin-top: 0; }
+.my-link input { margin: .35rem 0 .5rem; }
+.invite-actions :is(button, .button).small { font-size: .875rem; }

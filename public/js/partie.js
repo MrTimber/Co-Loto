@@ -56,6 +56,7 @@ function render() {
   $('game-info').textContent = `${state.players} joueurs · ${VARIANTS[state.variant].name.toLowerCase()}${draw} · réponses attendues jusqu'au ${formatMoment(state.deadline)}`;
   $('variant-hint').textContent = `${VARIANTS[state.variant].hint} Quand tout le monde a répondu, la partie est simulée tour par tour : à chaque tour, chacun joue le numéro suivant de son classement.`;
   $('seats').replaceChildren(...seatItems(state.seats, state.me.seat));
+  renderMyLink(rules);
   renderInvitations(rules);
   if (state.me.removed) {
     $('ranking-form').replaceChildren(el('p', '', 'Le créateur vous a retiré de cette partie.'));
@@ -64,6 +65,50 @@ function render() {
   } else {
     void renderRankingForm(rules);
   }
+}
+
+// Champ du lien et boutons pour le copier, l'envoyer par email ou le partager.
+function linkBox(url, label, { subject, text }) {
+  const input = el('input');
+  input.readOnly = true;
+  input.value = url;
+  input.setAttribute('aria-label', label);
+  const copy = el('button', 'small', 'Copier le lien');
+  copy.type = 'button';
+  copy.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(url);
+      copy.textContent = 'Lien copié !';
+    } catch {
+      input.select();
+    }
+  });
+  const mail = el('a', 'button small', 'Envoyer par email');
+  mail.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(`${text} : ${url}`)}`;
+  const actions = el('div', 'invite-actions', copy, mail);
+  if (navigator.share) {
+    const share = el('button', 'small', 'Partager…');
+    share.type = 'button';
+    share.addEventListener('click', () => navigator.share({ title: 'Co-Loto', text, url }).catch(() => {}));
+    actions.append(share);
+  }
+  return { input, actions };
+}
+
+// Son propre lien, pour revenir à la partie : sans compte, c'est le seul moyen de la retrouver
+// depuis un autre appareil (ou après avoir effacé les données du navigateur).
+function renderMyLink(rules) {
+  const show = state.status === 'waiting' && !state.me.removed;
+  $('my-link').hidden = !show;
+  if (!show) return;
+  const { input, actions } = linkBox(`${location.origin}/partie/${encodeURIComponent(link)}`, 'Votre lien personnel', {
+    subject: `Co-Loto : mon lien pour la partie ${rules.ofName} à distance`,
+    text: 'Mon lien personnel pour revenir à la partie Co-Loto (à ne pas partager)',
+  });
+  const hint = state.me.isHost
+    ? 'Gardez ce lien pour vous : c’est lui qui vous permet de suivre la partie et de retrouver les liens des joueurs. Copiez-le ou envoyez-le-vous par email.'
+    : 'Gardez ce lien pour vous : il vous permet de revenir à la partie et de modifier votre classement. Copiez-le ou envoyez-le-vous par email.';
+  $('my-link').replaceChildren(el('h2', '', 'Votre lien personnel'), el('p', 'small', hint), input, actions);
 }
 
 // Le créateur voit le lien de chaque place, à copier, partager ou envoyer par email.
@@ -79,29 +124,7 @@ function renderInvitations(rules) {
     .map((s) => {
       const url = `${location.origin}/partie/${encodeURIComponent(s.link)}`;
       const title = el('p', 'invite-title', el('strong', '', s.name ?? `Joueur ${s.seat + 1}`), ' ', s.submittedAt ? el('span', 'tag ok', 'a répondu') : el('span', 'tag warn', 'en attente'));
-      const input = el('input');
-      input.readOnly = true;
-      input.value = url;
-      input.setAttribute('aria-label', `Lien du joueur ${s.seat + 1}`);
-      const copy = el('button', 'small', 'Copier le lien');
-      copy.type = 'button';
-      copy.addEventListener('click', async () => {
-        try {
-          await navigator.clipboard.writeText(url);
-          copy.textContent = 'Lien copié !';
-        } catch {
-          input.select();
-        }
-      });
-      const mail = el('a', 'button small', 'Envoyer par email');
-      mail.href = `mailto:?subject=${encodeURIComponent(`Co-Loto : une grille ${rules.ofName} à co-créer`)}&body=${encodeURIComponent(`${text} : ${url}`)}`;
-      const actions = el('div', 'invite-actions', copy, mail);
-      if (navigator.share) {
-        const share = el('button', 'small', 'Partager…');
-        share.type = 'button';
-        share.addEventListener('click', () => navigator.share({ title: 'Co-Loto', text, url }).catch(() => {}));
-        actions.append(share);
-      }
+      const { input, actions } = linkBox(url, `Lien du joueur ${s.seat + 1}`, { subject: `Co-Loto : une grille ${rules.ofName} à co-créer`, text });
       if (!s.submittedAt) {
         const remove = el('button', 'link small', 'Retirer ce joueur');
         remove.type = 'button';
