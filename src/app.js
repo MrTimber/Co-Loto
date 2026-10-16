@@ -127,6 +127,7 @@ export function createApp({
       const { playerId, token } = joinAsNewPlayer(room, name);
       rooms.set(id, room);
       store.countEvent('room_created', game.gameType).catch((err) => console.error('Statistiques indisponibles :', err.message));
+      store.countEvent('room_mode', 'live').catch((err) => console.error('Statistiques indisponibles :', err.message));
       res.status(201).json({ roomId: id, playerId, token });
     } catch (err) {
       res.status(400).json({ error: err.message });

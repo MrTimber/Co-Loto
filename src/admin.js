@@ -3,7 +3,7 @@
 import express from 'express';
 import { fileURLToPath } from 'node:url';
 import { GAMES, getGame } from './games.js';
-import { dayOf } from './store.js';
+import { dayOf, PLAY_MODES } from './store.js';
 
 const ADMIN_DIR = fileURLToPath(new URL('../admin/', import.meta.url));
 const SECTIONS = ['utilisateurs', 'frequentation', 'numeros'];
@@ -113,6 +113,8 @@ export function createAdmin({ store, currentUser, live = () => ({}), now = () =>
       devices: totals(of('device')),
       roomsCreated: totals(of('room_created')),
       gamesFinished: totals(of('game_finished')),
+      roomModes: totals(of('room_mode')),
+      gridModes: await store.gridModes(from, to),
       signups: totals(of('signup')),
       logins: totals(of('login')),
     });
@@ -120,6 +122,7 @@ export function createAdmin({ store, currentUser, live = () => ({}), now = () =>
 
   router.get('/api/admin/numeros', api, async (req, res) => {
     const game = getGame(req.query.jeu) ?? GAMES.loto;
+    const mode = PLAY_MODES.includes(req.query.mode) ? req.query.mode : null;
     const today = dayOf(now());
     let { du: from, au: to, tirage: drawDate } = req.query;
     if (drawDate !== undefined) {
@@ -132,11 +135,12 @@ export function createAdmin({ store, currentUser, live = () => ({}), now = () =>
       if (from > to) return res.status(400).json({ error: 'La date de début doit précéder la date de fin.' });
       if (daysBetween(from, to) >= MAX_PERIOD_DAYS) return res.status(400).json({ error: 'La période ne peut pas dépasser un an.' });
     }
-    const grids = await store.gridStats({ gameType: game.id, from, to, drawDate });
+    const grids = await store.gridStats({ gameType: game.id, from, to, drawDate, mode });
     const [numbers, bonus] = game.phases;
     const average = (key) => (grids.length ? grids.reduce((s, g) => s + g[key], 0) / grids.length : 0);
     res.json({
       gameType: game.id,
+      mode,
       from: from ?? null,
       to: to ?? null,
       drawDate: drawDate ?? null,
@@ -145,7 +149,7 @@ export function createAdmin({ store, currentUser, live = () => ({}), now = () =>
       averageRounds: average('rounds'),
       numbers: frequencies(numbers, grids.map((g) => g.numbers)),
       bonus: frequencies(bonus, grids.map((g) => g.bonus)),
-      drawDates: await store.statsDrawDates(game.id),
+      drawDates: await store.statsDrawDates(game.id, mode),
     });
   });
 

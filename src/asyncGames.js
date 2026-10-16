@@ -108,6 +108,7 @@ export function createAsyncGames({ store, mailer, currentUser, baseUrl }) {
       drawDate: game.drawDate,
       participants: active.map((s) => ({ token: s.link, name: s.name, userId: s.userId })),
       mode: 'async',
+      variant: game.variant,
       validatedRounds: result.validatedRounds,
     });
     await sendResults(req, game, active, rules, result.validated[main.key], result.validated[extra.key]);
@@ -148,6 +149,7 @@ export function createAsyncGames({ store, mailer, currentUser, baseUrl }) {
       const user = await currentUser(req);
       if (user) await store.claimAsyncSeat(links[0], user.id);
       store.countEvent('room_created', gameType).catch((err) => console.error('Statistiques indisponibles :', err.message));
+      store.countEvent('room_mode', variant).catch((err) => console.error('Statistiques indisponibles :', err.message));
       res.status(201).json({ gameId: id, link: links[0] });
     } catch (err) {
       fail(res, err);
