@@ -354,7 +354,22 @@ test('un admin consulte les grilles d’un joueur, la fréquentation et les num�
 
   const overview = await json('/api/admin/apercu', { cookie: boss });
   assert.deepEqual(overview.modes.map((m) => [m.mode, m.total]).sort(), [['live', 1], ['quick', 1]]);
-  assert.deepEqual(overview.waiting, {});
+  assert.deepEqual(overview.remote, { games: 0, variants: { full: 0, quick: 0 }, byGame: {}, seats: 0, submitted: 0, endingSoon: 0 });
+  // Parties à distance en attente : places, classements reçus, date limite proche ; une partie
+  // dont la date limite est passée ne compte plus.
+  const soon = Date.now() + 3_600_000;
+  await store.createAsyncGame({ id: 'r1', gameType: 'loto', variant: 'quick', deadline: soon, links: ['r1a', 'r1b', 'r1c'] });
+  await store.createAsyncGame({ id: 'r2', gameType: 'euromillions', variant: 'full', links: ['r2a', 'r2b'] });
+  await store.createAsyncGame({ id: 'r3', gameType: 'loto', variant: 'full', deadline: Date.now() - 1, links: ['r3a', 'r3b'] });
+  await store.saveAsyncRanking('r1a', { name: 'Alice', ranking: {}, emailResult: false });
+  assert.deepEqual((await json('/api/admin/apercu', { cookie: boss })).remote, {
+    games: 2,
+    variants: { full: 1, quick: 1 },
+    byGame: { loto: 1, euromillions: 1 },
+    seats: 5,
+    submitted: 1,
+    endingSoon: 1,
+  });
   assert.equal(overview.month.gamesFinished, 2);
   assert.equal(overview.activeGrids, 2);
   assert.equal(typeof overview.live.connections, 'number');

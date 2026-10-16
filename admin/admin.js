@@ -114,29 +114,40 @@ function rankList(rows, names = {}, empty = 'Aucune donnée sur cette période.'
 
 // --- Tableau de bord ---
 
+// « Loto 2, Euromillions 1 », ou rien s'il n'y a aucune partie.
+function byGame(counts, label) {
+  const entries = Object.entries(counts);
+  return entries.length ? el('p', 'small muted', `${label} : `, entries.map(([g, n]) => `${gameName(g)} ${n}`).join(', ')) : '';
+}
+
 async function renderOverview() {
   const data = await getJson('/api/admin/apercu');
-  const { live, visits, month, users } = data;
+  const { live, remote, visits, month, users } = data;
   const conversion = month.roomsCreated ? `${percent.format(month.gamesFinished / month.roomsCreated)} des parties créées` : null;
   view.replaceChildren(
     panel(
-      'En ce moment',
+      'Parties en direct',
       el(
         'div',
         'tiles',
-        tile('Salons en attente', number.format(live.rooms.lobby), 'parties en direct'),
-        tile('Parties en direct en cours', number.format(live.rooms.playing)),
+        tile('Salons en attente', number.format(live.rooms.lobby)),
+        tile('Parties en cours', number.format(live.rooms.playing)),
         tile('Joueurs dans les salons', number.format(live.players)),
         tile('Connexions temps réel', number.format(live.connections)),
-        tile(
-          'Parties à distance en attente',
-          number.format((data.waiting.full ?? 0) + (data.waiting.quick ?? 0)),
-          `${number.format(data.waiting.full ?? 0)} classique · ${number.format(data.waiting.quick ?? 0)} éclair`,
-        ),
       ),
-      Object.keys(live.games).length
-        ? el('p', 'small muted', 'Salons ouverts par jeu : ', Object.entries(live.games).map(([g, n]) => `${gameName(g)} ${n}`).join(', '))
-        : '',
+      byGame(live.games, 'Salons ouverts par jeu'),
+    ),
+    panel(
+      'Parties à distance',
+      el(
+        'div',
+        'tiles',
+        tile('Parties en attente', number.format(remote.games), `${number.format(remote.variants.full ?? 0)} classique · ${number.format(remote.variants.quick ?? 0)} éclair`),
+        tile('Classements reçus', number.format(remote.submitted), `sur ${number.format(remote.seats)} joueur${remote.seats > 1 ? 's' : ''}`),
+        tile('Joueurs attendus', number.format(remote.seats - remote.submitted), 'n’ont pas encore classé leurs numéros'),
+        tile('Fin dans les 24 h', number.format(remote.endingSoon), 'parties dont la date limite approche'),
+      ),
+      byGame(remote.byGame, 'Parties en attente par jeu'),
     ),
     panel(
       'Visites',
