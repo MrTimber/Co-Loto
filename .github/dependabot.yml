@@ -1,0 +1,38 @@
+# Dependabot : PR automatiques de correction des failles connues.
+#
+# Les PR de sécurité sont déclenchées par les alertes Dependabot, à activer
+# dans Settings > Advanced Security (« Dependabot alerts » et
+# « Dependabot security updates »). Ce fichier fixe où chercher et comment
+# présenter ces PR.
+#
+# open-pull-requests-limit: 0 coupe les montées de version de confort :
+# seules les corrections de failles ouvrent des PR (cette limite ne
+# s'applique pas aux mises à jour de sécurité).
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: daily
+    open-pull-requests-limit: 0
+    labels:
+      - dependencies
+      - security
+    commit-message:
+      prefix: "Sécurité"
+    groups:
+      failles-npm:
+        applies-to: security-updates
+        patterns:
+          - "*"
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 0
+    labels:
+      - dependencies
+      - security
+    commit-message:
+      prefix: "Sécurité"
